@@ -6,6 +6,13 @@ Le dessin de l'affiche est présent en entier mais invisible. La voix et les not
 
 Tout tourne dans le navigateur (Chrome recommandé), sans serveur. Le micro sert uniquement à écouter : aucun son n'est enregistré ni envoyé.
 
+## Deux versions
+
+- **La cour dans le noir** (adresse du site) : le dessin de l'affiche, en couleurs, révélé par fragments.
+- **L'invocation** (`invocation.html`) : noir et blanc. Une fenêtre tracée au trait, avec sa profondeur. La musique appelle la créature : elle monte du fond, avance, ouvre les yeux, puis sort la tête au-delà du cadre pour regarder le conteur, la guitare et le public. Chaque note fait vibrer un trait de la fenêtre comme une corde.
+
+La version se choisit aussi sur l'écran de départ et depuis la régie.
+
 ## Utilisation
 
 - Ouvrir la page, choisir « Démarrer avec le micro de l'ordinateur », puis `F` pour le plein écran.

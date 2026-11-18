@@ -60,6 +60,7 @@
 <canvas id="c"></canvas>
 
 <div id="start">
+  <div style="display:flex;gap:10px"><button id="bVc" style="min-width:0">La cour dans le noir</button><button id="bVi" style="min-width:0">L'invocation, noir et blanc</button></div>
   <button id="bAudio">Démarrer avec le micro de l'ordinateur</button>
   <button id="bSim">Simulation au clavier</button>
   <button id="bDemo">Démonstration guidée (45 s)</button>
@@ -77,6 +78,13 @@
     <div class="st" id="rgSt">En attente de la scène...</div>
     <h2>Performance</h2>
     <div class="g"><button class="big" data-c="start">Lancer la performance</button><button data-c="end">Lancer la fin</button><button data-c="reset">Remise à zéro</button></div>
+    <h2>Version</h2>
+    <div class="g"><button data-ver="cour" id="rgVc">La cour dans le noir</button><button data-ver="inv" id="rgVi">L'invocation</button></div>
+    <div id="rgInvBox">
+      <h2>Invocation</h2>
+      <input type="range" id="rgInv" min="0" max="1" step="0.01" value="0">
+      <div class="g" style="margin-top:6px"><button data-inv="0">Au fond, dans le noir</button><button data-inv="0.7">À la fenêtre</button><button data-inv="1">Il sort la tête</button><button data-inv="auto" id="rgInvAuto">La musique décide</button></div>
+    </div>
     <h2>Regard</h2>
     <div class="g g3"><button data-c="look:cx">Conteur</button><button data-c="look:gt">Guitare</button><button data-c="look:pb">Public</button></div>
     <div class="g g3" style="margin-top:10px">
@@ -159,7 +167,11 @@ V (maintenu)  le conteur parle
 J K L         note grave, médium, aiguë
 X             accent (accord marqué)
 A             démonstration guidée
-I             afficher / masquer les indications</div>
+I             afficher / masquer les indications
+
+Invocation
+↑ ↓           le faire avancer ou reculer à la main
+M             rendre la main à la musique</div>
   <div style="margin-top:10px"><button id="bDefaults">Réglages par défaut</button></div>
 </div>
 
@@ -173,7 +185,7 @@ var DEF = {
   twoCh: false, vSplit: 0.45, swap: false, gainV: 0, gainG: 0, thrV: -45, thrG: -45, bleed: 15,
   cxX: -0.6, cxY: 0.1, gtX: 0.6, gtY: 0.1, pbX: 0, pbY: 0.3, mouse: false,
   zoom: 0.85, frameY: 0, eyeBright: 0.95, speed: 1, sleepAfter: 8,
-  maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
+  version: 'cour', maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
   duration: 240, autoEnd: false, simSound: true, remote: true, code: '', colL: '#f0f0f0', colY: '#fefe00', colG: '#0c6c42'
 };
 var S = {};
@@ -184,6 +196,9 @@ function loadS() {
 }
 function saveS() { try { localStorage.setItem('monstre-ecoute-3', JSON.stringify(S)); } catch (e) {} }
 loadS();
+if (/[?&]invocation\b/.test(location.search)) S.version = 'inv';
+if (/[?&]cour\b/.test(location.search)) S.version = 'cour';
+function isInv() { return S.version === 'inv'; }
 
 // Les couleurs de l'affiche : blanc (yeux), jaune du titre (lucioles), vert (iris). Tout le reste vient du dessin lui-même.
 var COL = {};
@@ -442,7 +457,7 @@ var DEMO = [
   [35.0, 'cap', 'Après un long silence, il se rendort.'],
   [44.0, 'cap', 'Fin de la démonstration. A pour la rejouer, ou jouez au clavier.'], [50.0, 'end']
 ];
-function startDemo() { demo.on = true; demo.t = 0; demo.i = 0; demo.cap = ''; sim.v = false; resetPerf(); sleep(); mind.lastSound = -99; legendOn = true; }
+function startDemo() { inv = 0; invForce = null; demo.on = true; demo.t = 0; demo.i = 0; demo.cap = ''; sim.v = false; resetPerf(); sleep(); mind.lastSound = -99; legendOn = true; }
 function tickDemo(dt) {
   if (!demo.on) return;
   demo.t += dt;
@@ -471,11 +486,12 @@ function refreshLegend() {
   document.getElementById('lgRG').className = 'row' + (gOn ? ' on' : '');
   document.querySelector('#lgV i').style.width = Math.round(V.lvl * 100) + '%';
   document.querySelector('#lgG i').style.width = Math.round(G.lvl * 100) + '%';
-  setText('lgVt', vOn ? 'Il parle. La lune respire, le dos de la créature affleure.' : 'Silencieux.');
-  setText('lgGt', gOn ? 'Note : ' + lastNote.name + '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.' : 'Silencieuse.');
+  setText('lgVt', vOn ? (isInv() ? 'Il parle : sa voix appelle la créature, elle avance.' : 'Il parle. La lune respire, le dos de la créature affleure.') : 'Silencieux.');
+  setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isInv() ? '. Un trait de la fenêtre vibre comme une corde, la créature avance.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
   var look = !mind.awake ? 'Il dort.' : 'Il regarde ' + (mind.target === 'cx' ? 'le conteur' : mind.target === 'gt' ? 'la guitare' : mind.target === 'xy' ? 'où tu lui dis' : 'le public') + (T < mind.glanceUntil ? ' (coup d\'œil)' : '') + (eye.wide > 0.3 ? ', surpris' : '') + '.';
-  setText('lgCap', demo.on || demo.cap ? demo.cap : look);
-  setText('lgFoot', (demo.on || demo.cap ? look + '   ' : '') + (audio.ok ? 'Ce que le micro entend. I : masquer.' : 'V maintenu : voix   ·   J K L : note grave, médium, aiguë   ·   X : accent   ·   A : démonstration   ·   I : masquer'));
+  if (isInv()) look = (inv < 0.05 ? 'Elle n\'est pas encore là.' : inv < 0.4 ? 'Quelque chose monte du fond.' : inv < 0.72 ? 'Elle avance vers la fenêtre.' : 'Elle sort la tête.') + ' ' + look + '  (invocation : ' + Math.round(inv * 100) + ' %)';
+  setText('lgCap', demo.on || demo.cap ? (isInv() ? look : demo.cap) : look);
+  setText('lgFoot', (!isInv() && (demo.on || demo.cap) ? look + '   ' : '') + (audio.ok ? 'Ce que le micro entend. I : masquer.' : 'V maintenu : voix   ·   J K L : note grave, médium, aiguë   ·   X : accent   ·   A : démonstration   ·   I : masquer'));
 }
 
 // ---------- Le monstre ----------
@@ -581,9 +597,9 @@ function lightCap() {
   if (perf.phase === 'ending') c *= 1 - smooth(perf.endT / 8);
   return c;
 }
-function startPerf() { perf.phase = 'armed'; perf.t = 0; sleep(); mind.forced = null; flies.length = 0; }
+function startPerf() { perf.phase = 'armed'; perf.t = 0; sleep(); mind.forced = null; flies.length = 0; inv = 0; invForce = null; }
 function endPerf() { if (perf.phase === 'run' || perf.phase === 'idle' || perf.phase === 'armed') { perf.phase = 'ending'; perf.endT = 0; mind.forced = null; } }
-function resetPerf() { perf.phase = 'idle'; perf.t = 0; mind.forced = null; }
+function resetPerf() { perf.phase = 'idle'; perf.t = 0; mind.forced = null; invForce = null; }
 function tickPerf(dt) {
   if (perf.phase === 'run') { perf.t += dt; if (S.autoEnd && perf.t >= S.duration) endPerf(); }
   if (perf.phase === 'ending') {
@@ -596,7 +612,7 @@ function tickPerf(dt) {
 // ---------- L'affiche, dans le noir ----------
 // Le dessin d'origine est là, entier, mais invisible. Seules les lumières en laissent voir des fragments.
 var BW = 2400, BH = 1750, poster = new Image(), posterOK = false;
-poster.onload = function () { posterOK = true; }; poster.src = POSTER_SRC;
+poster.onload = function () { posterOK = true; try { bakeHead(); } catch (e) {} }; poster.src = POSTER_SRC;
 var maskCv = document.createElement('canvas'), mctx = maskCv.getContext('2d'), view = { k: 1, x: 0, y: 0 };
 function layout() {
   view.k = S.zoom * H / BH; view.x = W / 2 - BW / 2 * view.k; view.y = S.frameY * H;
@@ -629,6 +645,7 @@ function spawnFly(p, str) {
   if (flies.length > 30) flies.shift();
 }
 function trigger(name, str) {
+  if (isInv()) { pluck(Math.floor(Math.random() * 12), 0.9); return; }
   str = str === undefined ? 0.8 : str;
   if (name === 'moon') fx.kMoon = 1;
   else if (name === 'back') fx.kBack = 1;
@@ -640,6 +657,7 @@ function trigger(name, str) {
 }
 // Une note : une luciole, et un détail d'architecture selon sa hauteur
 function onNote(p, str) {
+  if (isInv()) { pluck(Math.floor(p * 11.99), str); if (str > 0.85) { pluck(0, 1); pluck(2, 1); } glint.a = Math.max(glint.a, 0.35 + 0.65 * str); return; }
   if (S.lyFly) spawnFly(p, str);
   if (p < 0.34) { if (S.lyWin) trigger('win', str); }
   else if (p > 0.66) { if (S.lyAwn) trigger('awn', str); }
@@ -723,26 +741,108 @@ function drawScene(dt, cap) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
+// ---------- L'invocation (version noir et blanc) ----------
+// Une fenêtre tracée au trait dans le noir, avec sa profondeur. La musique appelle la créature : elle monte du fond,
+// avance, ouvre les yeux, puis sort la tête par la fenêtre, au-delà du cadre, pour regarder le conteur, la guitare, le public.
+var HB = { x: 520, y: 790, w: 1400, h: 810, cx: 700, gy: 770 }, headCv = null;
+function bakeHead() {
+  var c = document.createElement('canvas'); c.width = HB.w; c.height = HB.h; var g = c.getContext('2d');
+  g.drawImage(poster, -HB.x, -HB.y);
+  var im = g.getImageData(0, 0, HB.w, HB.h), d = im.data, x, y, i, cy = 710, rx = 640, ry = 672;
+  for (y = 0; y < HB.h; y++) for (x = 0; x < HB.w; x++) {
+    i = (y * HB.w + x) * 4;
+    var dx = (x - HB.cx) / rx, dy = (y - cy) / ry, q = dx * dx + dy * dy, m = q >= 1 ? 0 : q > 0.94 ? (1 - q) / 0.06 : 1;
+    if (y > 755) m *= clamp((775 - y) / 20, 0, 1);
+    if (x - HB.cx > 470) m *= clamp((590 - (x - HB.cx)) / 120, 0, 1);            // on écarte la silhouette appuyée contre lui
+    m *= Math.pow(clamp((775 - y) / 380, 0, 1), 0.9);                             // la lumière vient d'en haut, le bas reste dans l'ombre
+    var l = 255 * Math.pow(Math.min(1, (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255 * 2.6), 1.5) * m;
+    d[i] = d[i + 1] = d[i + 2] = l; d[i + 3] = 255;
+  }
+  g.putImageData(im, 0, 0); headCv = c;
+}
+var inv = 0, invForce = null, headYaw = 0, strings = [], headT = { k: 1, x: 0, y: 0 };
+(function () { for (var i = 0; i < 12; i++) strings.push({ amp: 0, ph: 0, f: 0, glow: 0 }); })();
+function pluck(i, str) { var st = strings[((i % 12) + 12) % 12]; st.amp = Math.max(st.amp, 0.4 + 0.6 * str); st.glow = Math.max(st.glow, 0.5 + 0.5 * str); st.ph = 0; st.f = 16 + (i % 12) * 2.2; }
+function invCap() {
+  if (perf.phase === 'idle') return 1;
+  if (perf.phase === 'armed' || perf.phase === 'done') return 0;
+  return clamp(0.12 + 0.88 * smooth(perf.t / (S.duration * 0.62)), 0, 1);
+}
+function ease(t) { return t * t * (3 - 2 * t); }
+function drawInvocation(dt, cap) {
+  var lum = cap * S.maxLum, i;
+  voiceEnv = approach(voiceEnv, V.lvl, dt, V.lvl > voiceEnv ? 0.25 : 1.1);
+  guitEnv = approach(guitEnv, G.lvl, dt, G.lvl > guitEnv ? 0.1 : 0.9);
+  // La musique l'appelle ; le silence le laisse repartir, lentement
+  var act = Math.max(voiceEnv, guitEnv);
+  if (invForce !== null) inv = approach(inv, invForce, dt, 0.9);
+  else if (perf.phase === 'ending') inv = Math.max(0, inv - dt * 0.11);
+  else { inv += dt * (act > 0.05 ? 0.032 * (0.4 + act) : -0.012); inv = clamp(inv, 0, invCap()); }
+  headYaw = approach(headYaw, mind.awake ? eye.gx : 0, dt, 0.55);
+
+  // La fenêtre et sa profondeur
+  var Hh = Math.min(H, W / 1.6), ww = Hh * 0.92, wh = ww * 0.5, x0 = W / 2 - ww / 2, x1 = W / 2 + ww / 2, y1 = H * 0.70, y0 = y1 - wh;
+  var bs = 0.44, bcx = W / 2, bcy = y0 + wh * 0.46, bx0 = bcx - ww * bs / 2, bx1 = bcx + ww * bs / 2, by0 = bcy - wh * bs / 2, by1 = bcy + wh * bs / 2;
+  var L = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0],
+           [bx0, by0, bx1, by0], [bx1, by0, bx1, by1], [bx1, by1, bx0, by1], [bx0, by1, bx0, by0],
+           [x0, y0, bx0, by0], [x1, y0, bx1, by0], [x1, y1, bx1, by1], [x0, y1, bx0, by1]];
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (i = 0; i < 12; i++) {
+    var st = strings[i], ln = L[i]; st.ph += dt * st.f; st.amp *= Math.exp(-dt / 0.9); st.glow *= Math.exp(-dt / 1.4);
+    var front = i < 4, base = (front ? 0.24 + 0.40 * inv : 0.09 + 0.16 * inv) * lum, al = clamp(base + st.glow * 0.6 * (0.35 + 0.65 * lum), 0, 1);
+    if (al < 0.006) continue;
+    var dxl = ln[2] - ln[0], dyl = ln[3] - ln[1], len = Math.sqrt(dxl * dxl + dyl * dyl) || 1, nx = -dyl / len, ny = dxl / len, a = st.amp * Hh * 0.011 * Math.sin(st.ph), j;
+    ctx.strokeStyle = 'rgba(255,255,255,' + al.toFixed(3) + ')'; ctx.lineWidth = Math.max(1, Hh * (front ? 0.0026 : 0.0016)); ctx.beginPath();
+    for (j = 0; j <= 24; j++) { var u = j / 24, w = Math.sin(Math.PI * u) * a; if (j) ctx.lineTo(ln[0] + dxl * u + nx * w, ln[1] + dyl * u + ny * w); else ctx.moveTo(ln[0] + dxl * u + nx * w, ln[1] + dyl * u + ny * w); }
+    ctx.stroke();
+  }
+
+  // La créature : elle monte du fond, avance, puis passe la tête par la fenêtre
+  if (!headCv || inv < 0.01) { headT.k = 0; return; }
+  var d = ease(clamp(inv / 0.72, 0, 1)), out = ease(clamp((inv - 0.72) / 0.28, 0, 1)), rise = ease(clamp(inv / 0.28, 0, 1));
+  var sc = lerp(bs, 1, d) * (1 + 0.5 * out) * (1 + 0.012 * out * Math.sin(T * 0.9)), hw = ww * 0.80 * sc, k = hw / 1280, floorY = lerp(by1, y1, d);
+  var bob = Math.sin(T * 1.1) * Hh * 0.004 * sc, X = W / 2 + headYaw * hw * 0.045, Y = floorY + (1 - rise) * 690 * k + bob * (1 - out);
+  headT.k = k; headT.x = X - HB.cx * k; headT.y = Y - HB.gy * k;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, W, floorY + 0.5); ctx.clip();                      // il sort du sol de la boîte
+  ctx.setTransform(k, 0, 0, k, headT.x, headT.y);
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(HB.cx, 710, 648, 680, 0, 0, Math.PI * 2); ctx.fill();   // son corps cache les traits derrière lui
+  var rim = clamp((0.18 + 0.82 * Math.max(voiceEnv, guitEnv * 0.6)) * (0.35 + 0.65 * inv) * lum * 1.25, 0, 0.8);
+  ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = rim; ctx.drawImage(headCv, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+}
+function drawEyesInv() {
+  if (!headT.k) return;
+  var o = eye.open * ease(clamp((inv - 0.38) / 0.16, 0, 1)); if (eye.blink > 0) o *= Math.abs(eye.blink - 0.075) / 0.075 * 0.9 + 0.02;
+  if (o < 0.004) return;
+  ctx.save(); ctx.setTransform(headT.k, 0, 0, headT.k, headT.x + headYaw * 26 * headT.k, headT.y);
+  for (var i = 0; i < 2; i++) {
+    var E = EYES[i], far = (i === 0 ? headYaw > 0 : headYaw < 0) ? 1 - 0.14 * Math.abs(headYaw) : 1;
+    drawEyeP({ cx: E.cx - HB.x, cy: E.cy - HB.y, rx: E.rx * far, ry: E.ry, g: [E.g[0] - HB.x, E.g[1] - HB.y, E.g[2] - HB.x, E.g[3] - HB.y], ix: E.ix - HB.x, iy: E.iy - HB.y }, o, eye.wide, eye.gx, eye.gy, 0, true);
+  }
+  ctx.restore();
+}
+
 // ---------- Les yeux de la créature ----------
 // Même place, même forme que sur l'affiche : deux demi-disques blancs au ras du sol, iris vert, pupille noire.
 var EYES = [
   { cx: 981, cy: 1560, rx: 114, ry: 108, g: [867, 1548, 1095, 1566], ix: 987, iy: 1547 },
   { cx: 1495, cy: 1555, rx: 107, ry: 123, g: [1389, 1560, 1602, 1538], ix: 1495, iy: 1539 }
 ];
-function drawEyeP(E, open, wide, gx, gy, breath) {
+function drawEyeP(E, open, wide, gx, gy, breath, bw) {
   var e = smooth(open), sc = 1 + 0.07 * wide, rx = E.rx * sc, ry = E.ry * sc * (0.055 + 0.945 * e) * (1 + breath * (1 - e));
   var sl = (E.g[3] - E.g[1]) / (E.g[2] - E.g[0]), x1 = E.g[0] - 80, y1 = E.g[1] - sl * 80, x2 = E.g[2] + 80, y2 = E.g[3] + sl * 80;
   ctx.save();
   ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 - 500); ctx.lineTo(x1, y1 - 500); ctx.closePath(); ctx.clip();   // derrière le sol
   ctx.beginPath(); ctx.ellipse(E.cx, E.cy, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
-  ctx.fillStyle = rgba(COL.eye, S.eyeBright); ctx.fillRect(E.cx - rx - 2, E.cy - ry - 2, rx * 2 + 4, ry * 2 + 4);
+  ctx.fillStyle = bw ? 'rgba(255,255,255,' + S.eyeBright + ')' : rgba(COL.eye, S.eyeBright); ctx.fillRect(E.cx - rx - 2, E.cy - ry - 2, rx * 2 + 4, ry * 2 + 4);
   if (e > 0.05) {
     var ri = 37 * (1 - 0.10 * wide), px = E.ix + clamp(gx, -1, 1) * (rx - ri) * 0.72, py = E.iy + clamp(gy, -1, 1) * E.ry * 0.42 - wide * 10;
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(px, py, ri, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = rgba(COL.teal, 1); ctx.beginPath(); ctx.arc(px, py, ri * 0.82, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = bw ? '#8a8a8a' : rgba(COL.teal, 1); ctx.beginPath(); ctx.arc(px, py, ri * 0.82, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(px, py, ri * 0.40 * (1 + 0.25 * voiceEnv), 0, Math.PI * 2); ctx.fill();
     var hr = ri * (0.09 + 0.10 * glint.a);
-    ctx.fillStyle = glint.a > 0.06 ? rgba(COL.light, 1) : rgba(COL.eye, 1); ctx.beginPath(); ctx.arc(px + ri * 0.14, py - ri * 0.12, hr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = bw ? '#fff' : glint.a > 0.06 ? rgba(COL.light, 1) : rgba(COL.eye, 1); ctx.beginPath(); ctx.arc(px + ri * 0.14, py - ri * 0.12, hr, 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
 }
@@ -788,6 +888,8 @@ function doCmd(c, v) {
   else if (c === 'blink') eye.blink = 0.16;
   else if (c === 'wide') eye.wide = 1;
   else if (c === 'fx') { if (['moon', 'back', 'win', 'stripe', 'awn', 'wave', 'fly'].indexOf(v) >= 0) trigger(v); }
+  else if (c === 'inv') { invForce = v === 'auto' ? null : clamp(parseFloat(v) || 0, 0, 1); if (invForce !== null && invForce > 0.3) wake(); }
+  else if (c === 'version') { S.version = v === 'inv' ? 'inv' : 'cour'; saveS(); syncStart(); }
   else if (c === 'reveal') { S.reveal = clamp(parseFloat(v) || 0.55, 0.2, 1.6); saveS(); syncPanel(); }
   else if (c === 'lum') { S.maxLum = clamp(parseFloat(v) || 0, 0, 1); saveS(); syncPanel(); }
   else if (c === 'toggle') { var ok = DECOR.some(function (d) { return d[0] === v; }); if (ok) { S[v] = !S[v]; saveS(); syncPanel(); } }
@@ -795,7 +897,7 @@ function doCmd(c, v) {
 }
 function stageState() {
   var d = {}; DECOR.forEach(function (x) { d[x[0]] = S[x[0]] ? 1 : 0; });
-  return { ph: perf.phase, aw: mind.awake ? 1 : 0, fo: mind.forced || '', t: Math.round(perf.t), lum: S.maxLum, rv: S.reveal, d: d, mic: audio.ok ? 1 : 0 };
+  return { ph: perf.phase, aw: mind.awake ? 1 : 0, fo: mind.forced || '', t: Math.round(perf.t), lum: S.maxLum, rv: S.reveal, ver: S.version, inv: Math.round(inv * 100), invA: invForce === null ? 1 : 0, d: d, mic: audio.ok ? 1 : 0 };
 }
 // Ouvre la liaison : relais de Kinesia si la page est sur le site, sinon ntfy
 function openLink(code, side, onMsg, onStatus, cb) {
@@ -850,6 +952,9 @@ function regiePage() {
       Array.prototype.forEach.call(dec.children, function (b) { b.className = st.d[b.getAttribute('data-t')] ? 'on' : ''; });
       if (document.activeElement !== document.getElementById('rgLum')) document.getElementById('rgLum').value = st.lum;
       if (st.rv && document.activeElement !== document.getElementById('rgRev')) document.getElementById('rgRev').value = st.rv;
+      document.getElementById('rgVc').className = st.ver === 'inv' ? '' : 'on'; document.getElementById('rgVi').className = st.ver === 'inv' ? 'on' : '';
+      document.getElementById('rgInvBox').style.display = st.ver === 'inv' ? 'block' : 'none'; document.getElementById('rgInvAuto').className = st.invA ? 'on' : '';
+      if (document.activeElement !== document.getElementById('rgInv')) document.getElementById('rgInv').value = (st.inv || 0) / 100;
       document.getElementById('rgHint').textContent = st.mic ? 'La scène écoute le micro.' : 'La scène est en simulation (pas de micro).';
     }
     document.getElementById('rgSt').textContent = t;
@@ -869,10 +974,14 @@ function regiePage() {
     if (b.getAttribute('data-c')) send(b.getAttribute('data-c'));
     else if (b.getAttribute('data-t')) send('toggle', b.getAttribute('data-t'));
     else if (b.getAttribute('data-g')) send('gaze', b.getAttribute('data-g'));
+    else if (b.getAttribute('data-ver')) send('version', b.getAttribute('data-ver'));
+    else if (b.getAttribute('data-inv')) send('inv', b.getAttribute('data-inv'));
     else if (b.getAttribute('data-f')) send('fx', b.getAttribute('data-f'));
   });
   document.getElementById('rgLum').addEventListener('change', function () { send('lum', this.value); });
   document.getElementById('rgRev').addEventListener('change', function () { send('reveal', this.value); });
+  document.getElementById('rgInv').addEventListener('input', function () { var n = Date.now(); if (link && link.fast && n - (this._t || 0) > 80) { this._t = n; send('inv', this.value); } });
+  document.getElementById('rgInv').addEventListener('change', function () { send('inv', this.value); });
   var pad = document.getElementById('rgPad'), dot = document.getElementById('rgDot'), lastG = 0, down = false;
   function padMove(e) {
     var r = pad.getBoundingClientRect(), x = clamp((e.clientX - r.left) / r.width, 0, 1), y = clamp((e.clientY - r.top) / r.height, 0, 1);
@@ -905,8 +1014,8 @@ function frame(ms) {
 
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-  drawScene(dt, lightCap());
-  drawEyes();
+  if (isInv()) { layout(); drawInvocation(dt, lightCap()); drawEyesInv(); } else { drawScene(dt, lightCap());
+  drawEyes(); }
   G.onset = false; V.onset = false;
   if (panelOpen) refreshPanel();
   refreshLegend();
@@ -1028,6 +1137,10 @@ function begin(withAudio) {
   document.body.classList.add('nocursor');
   if (withAudio) connect(null);
 }
+function syncStart() { document.getElementById('bVc').style.borderColor = isInv() ? '#444' : '#fefe00'; document.getElementById('bVi').style.borderColor = isInv() ? '#fff' : '#444'; }
+document.getElementById('bVc').onclick = function () { S.version = 'cour'; saveS(); syncStart(); };
+document.getElementById('bVi').onclick = function () { S.version = 'inv'; saveS(); syncStart(); };
+syncStart();
 document.getElementById('bAudio').onclick = function () { begin(true); };
 document.getElementById('bSim').onclick = function () { begin(false); };
 document.getElementById('bDemo').onclick = function () { begin(false); startDemo(); };
@@ -1043,6 +1156,9 @@ window.addEventListener('keydown', function (e) {
   if (c === 'Space') { e.preventDefault(); if (started && !e.repeat) doCmd('start'); return; }
   if (c === 'Enter' || c === 'NumpadEnter') { e.preventDefault(); if (!e.repeat) doCmd('end'); return; }
   if (e.repeat) return;
+  if (c === 'ArrowUp') { invForce = clamp((invForce === null ? inv : invForce) + 0.05, 0, 1); wake(); return; }
+  if (c === 'ArrowDown') { invForce = clamp((invForce === null ? inv : invForce) - 0.05, 0, 1); return; }
+  if (k === 'm') { invForce = null; return; }
   if (k === 'h') togglePanel();
   else if (k === 'i') legendOn = !legendOn;
   else if (k === 'a') { if (!audio.ok) { ensureAC(); startDemo(); } }
