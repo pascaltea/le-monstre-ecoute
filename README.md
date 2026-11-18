@@ -6,8 +6,9 @@ Le dessin de l'affiche est présent en entier mais invisible. La voix et les not
 
 Tout tourne dans le navigateur (Chrome recommandé), sans serveur. Le micro sert uniquement à écouter : aucun son n'est enregistré ni envoyé.
 
-## Deux versions
+## Trois versions
 
+- **Les yeux** (par défaut) : le noir, et ses deux yeux, ceux de l'affiche. Ils regardent le conteur ou le musicien. Chaque note est une luciole qui laisse deviner un peu de sa silhouette.
 - **La cour dans le noir** (adresse du site) : le dessin de l'affiche, en couleurs, révélé par fragments.
 - **L'invocation** (`invocation.html`) : noir et blanc, en 3D. Un mur noir percé d'une fenêtre, une boîte derrière. La musique appelle la créature : elle monte du fond, s'approche, passe la tête par la fenêtre, puis la lève au-dessus du cadre et la penche vers le conteur, la guitare et le public. Chaque note est une luciole ; la voix les attire, certaines sortent de l'écran.
 
