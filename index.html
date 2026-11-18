@@ -489,7 +489,8 @@ function refreshLegend() {
   setText('lgVt', vOn ? (isInv() ? 'Il parle : sa voix appelle la créature, elle avance.' : 'Il parle. La lune respire, le dos de la créature affleure.') : 'Silencieux.');
   setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isInv() ? '. Un trait de la fenêtre vibre comme une corde, la créature avance.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
   var look = !mind.awake ? 'Il dort.' : 'Il regarde ' + (mind.target === 'cx' ? 'le conteur' : mind.target === 'gt' ? 'la guitare' : mind.target === 'xy' ? 'où tu lui dis' : 'le public') + (T < mind.glanceUntil ? ' (coup d\'œil)' : '') + (eye.wide > 0.3 ? ', surpris' : '') + '.';
-  if (isInv()) look = (inv < 0.05 ? 'Elle n\'est pas encore là.' : inv < 0.4 ? 'Quelque chose monte du fond.' : inv < 0.72 ? 'Elle avance vers la fenêtre.' : 'Elle sort la tête.') + ' ' + look + '  (invocation : ' + Math.round(inv * 100) + ' %)';
+  if (isInv()) look = look.replace('Il regarde', 'Elle regarde').replace('Il dort.', 'Elle dort.').replace('surpris', 'surprise');
+  if (isInv()) look = (inv < 0.05 ? 'Elle n\'est pas encore là.' : inv < 0.4 ? 'Quelque chose monte du fond.' : inv < 0.72 ? 'Elle avance vers la fenêtre.' : inv < 0.99 ? 'Elle passe la tête par la fenêtre.' : 'Elle est sortie.') + ' ' + look + '  (invocation : ' + Math.round(inv * 100) + ' %)';
   setText('lgCap', demo.on || demo.cap ? (isInv() ? look : demo.cap) : look);
   setText('lgFoot', (!isInv() && (demo.on || demo.cap) ? look + '   ' : '') + (audio.ok ? 'Ce que le micro entend. I : masquer.' : 'V maintenu : voix   ·   J K L : note grave, médium, aiguë   ·   X : accent   ·   A : démonstration   ·   I : masquer'));
 }
@@ -597,7 +598,7 @@ function lightCap() {
   if (perf.phase === 'ending') c *= 1 - smooth(perf.endT / 8);
   return c;
 }
-function startPerf() { perf.phase = 'armed'; perf.t = 0; sleep(); mind.forced = null; flies.length = 0; inv = 0; invForce = null; }
+function startPerf() { perf.phase = 'armed'; perf.t = 0; sleep(); mind.forced = null; flies.length = 0; inv = 0; invForce = null; vis = 0; visV = 0; }
 function endPerf() { if (perf.phase === 'run' || perf.phase === 'idle' || perf.phase === 'armed') { perf.phase = 'ending'; perf.endT = 0; mind.forced = null; } }
 function resetPerf() { perf.phase = 'idle'; perf.t = 0; mind.forced = null; invForce = null; }
 function tickPerf(dt) {
@@ -657,7 +658,7 @@ function trigger(name, str) {
 }
 // Une note : une luciole, et un détail d'architecture selon sa hauteur
 function onNote(p, str) {
-  if (isInv()) { pluck(Math.floor(p * 11.99), str); if (str > 0.85) { pluck(0, 1); pluck(2, 1); } glint.a = Math.max(glint.a, 0.35 + 0.65 * str); return; }
+  if (isInv()) { pluck(Math.floor(p * 11.99), str); if (str > 0.85) { pluck(0, 1); pluck(2, 1); flinch = Math.max(flinch, 0.16); } glint.a = Math.max(glint.a, 0.35 + 0.65 * str); return; }
   if (S.lyFly) spawnFly(p, str);
   if (p < 0.34) { if (S.lyWin) trigger('win', str); }
   else if (p > 0.66) { if (S.lyAwn) trigger('awn', str); }
@@ -760,7 +761,8 @@ function bakeHead() {
   }
   g.putImageData(im, 0, 0); headCv = c;
 }
-var inv = 0, invForce = null, headYaw = 0, strings = [], headT = { k: 1, x: 0, y: 0 };
+var inv = 0, invForce = null, headYaw = 0, strings = [], headT = { k: 0, x: 0, y: 0, roll: 0, out: 0, clip: 0 };
+var vis = 0, visV = 0, flinch = 0, headRoll = 0, headPitch = 0, curious = 0, lastTarget = '';
 (function () { for (var i = 0; i < 12; i++) strings.push({ amp: 0, ph: 0, f: 0, glow: 0 }); })();
 function pluck(i, str) { var st = strings[((i % 12) + 12) % 12]; st.amp = Math.max(st.amp, 0.4 + 0.6 * str); st.glow = Math.max(st.glow, 0.5 + 0.5 * str); st.ph = 0; st.f = 16 + (i % 12) * 2.2; }
 function invCap() {
@@ -780,9 +782,29 @@ function drawInvocation(dt, cap) {
   else { inv += dt * (act > 0.05 ? 0.032 * (0.4 + act) : -0.012); inv = clamp(inv, 0, invCap()); }
   headYaw = approach(headYaw, mind.awake ? eye.gx : 0, dt, 0.55);
 
-  // La fenêtre et sa profondeur
+  // Le mouvement : elle n'avance pas comme un curseur. Un ressort lui donne de l'élan, un accent la fait reculer d'un coup,
+  // un nouveau son lui fait pencher la tête.
+  flinch = approach(flinch, 0, dt, 0.9);
+  var goal = clamp(inv - flinch, 0, 1), wv = 4.2, zv = 0.55;
+  visV += (wv * wv * (goal - vis) - 2 * zv * wv * visV) * dt; vis = clamp(vis + visV * dt, 0, 1.06);
+  if (mind.target !== lastTarget) { lastTarget = mind.target; curious = (Math.random() < 0.5 ? -1 : 1) * 0.07; }
+  curious = approach(curious, 0, dt, 1.6);
+  headYaw = approach(headYaw, mind.awake ? eye.gx : 0, dt, 0.5);
+  headPitch = approach(headPitch, mind.awake ? eye.gy : 0, dt, 0.6);
+  headRoll = approach(headRoll, headYaw * 0.085 + curious + Math.sin(T * 0.37) * 0.012, dt, 0.45);
+
+  var d = ease(clamp(vis / 0.70, 0, 1)), out = ease(clamp((vis - 0.70) / 0.30, 0, 1)), rise = ease(clamp(vis / 0.26, 0, 1));
+
+  // La fenêtre et sa profondeur. Le fond glisse à l'opposé de sa tête : c'est ce décalage qui creuse la boîte.
   var Hh = Math.min(H, W / 1.6), ww = Hh * 0.92, wh = ww * 0.5, x0 = W / 2 - ww / 2, x1 = W / 2 + ww / 2, y1 = H * 0.70, y0 = y1 - wh;
-  var bs = 0.44, bcx = W / 2, bcy = y0 + wh * 0.46, bx0 = bcx - ww * bs / 2, bx1 = bcx + ww * bs / 2, by0 = bcy - wh * bs / 2, by1 = bcy + wh * bs / 2;
+  var bs = 0.44, bcx = W / 2 - headYaw * ww * 0.035 + Math.sin(T * 0.21) * ww * 0.006, bcy = y0 + wh * 0.46 - headPitch * wh * 0.02;
+  var bx0 = bcx - ww * bs / 2, bx1 = bcx + ww * bs / 2, by0 = bcy - wh * bs / 2, by1 = bcy + wh * bs / 2;
+  // Le sol de la boîte reçoit un peu de lumière : sa silhouette s'y découpe quand elle approche
+  var fl = lum * (0.03 + 0.07 * vis);
+  if (fl > 0.004) {
+    var fg = ctx.createLinearGradient(0, by1, 0, y1); fg.addColorStop(0, 'rgba(255,255,255,0)'); fg.addColorStop(1, 'rgba(255,255,255,' + fl.toFixed(3) + ')');
+    ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(bx0, by1); ctx.lineTo(bx1, by1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y1); ctx.closePath(); ctx.fill();
+  }
   var L = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0],
            [bx0, by0, bx1, by0], [bx1, by0, bx1, by1], [bx1, by1, bx0, by1], [bx0, by1, bx0, by0],
            [x0, y0, bx0, by0], [x1, y0, bx1, by0], [x1, y1, bx1, by1], [x0, y1, bx0, by1]];
@@ -797,28 +819,45 @@ function drawInvocation(dt, cap) {
     ctx.stroke();
   }
 
-  // La créature : elle monte du fond, avance, puis passe la tête par la fenêtre
-  if (!headCv || inv < 0.01) { headT.k = 0; return; }
-  var d = ease(clamp(inv / 0.72, 0, 1)), out = ease(clamp((inv - 0.72) / 0.28, 0, 1)), rise = ease(clamp(inv / 0.28, 0, 1));
-  var sc = lerp(bs, 1, d) * (1 + 0.5 * out) * (1 + 0.012 * out * Math.sin(T * 0.9)), hw = ww * 0.80 * sc, k = hw / 1280, floorY = lerp(by1, y1, d);
-  var bob = Math.sin(T * 1.1) * Hh * 0.004 * sc, X = W / 2 + headYaw * hw * 0.045, Y = floorY + (1 - rise) * 690 * k + bob * (1 - out);
-  headT.k = k; headT.x = X - HB.cx * k; headT.y = Y - HB.gy * k;
+  // La créature
+  headT.k = 0;
+  if (!headCv || vis < 0.01) return;
+  var breathe = 1 + 0.010 * Math.sin(T * 1.05);
+  var sc = lerp(bs, 1, d) * (1 + 0.44 * out) * breathe, hw = ww * 0.78 * sc, k = hw / 1280, floorY = lerp(by1, y1, d);
+  var walk = Math.sin(vis * 46) * (1 - out) * d * (1 - d) * 4;                       // elle se dandine en approchant
+  var X = lerp(bcx, W / 2, d) + headYaw * hw * (0.04 + 0.10 * out) + walk * hw * 0.012;
+  var Y = floorY + (1 - rise) * 700 * k + out * hw * 0.10 - headPitch * out * hw * 0.02;     // dehors, elle passe par-dessus le bord
+  var clipY = floorY + out * hw * 0.5;
+  headT.k = k; headT.x = X; headT.y = Y; headT.roll = headRoll * (0.35 + 0.65 * d) + walk * 0.02; headT.out = out; headT.clip = clipY;
   ctx.save();
-  ctx.beginPath(); ctx.rect(0, 0, W, floorY + 0.5); ctx.clip();                      // il sort du sol de la boîte
-  ctx.setTransform(k, 0, 0, k, headT.x, headT.y);
-  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(HB.cx, 710, 648, 680, 0, 0, Math.PI * 2); ctx.fill();   // son corps cache les traits derrière lui
-  var rim = clamp((0.18 + 0.82 * Math.max(voiceEnv, guitEnv * 0.6)) * (0.35 + 0.65 * inv) * lum * 1.25, 0, 0.8);
-  ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = rim; ctx.drawImage(headCv, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.beginPath(); ctx.rect(0, 0, W, clipY + 0.5); ctx.clip();
+  // son ombre sur le sol de la boîte
+  if (out < 0.95) { ctx.fillStyle = 'rgba(0,0,0,' + (0.85 * (1 - out)).toFixed(3) + ')'; ctx.beginPath(); ctx.ellipse(X, floorY, hw * 0.58, hw * 0.05, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.translate(X, Y); ctx.rotate(headT.roll); ctx.scale(k, k); ctx.translate(-HB.cx, -HB.gy);
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(HB.cx, 710, 650, 682, 0, 0, Math.PI * 2); ctx.fill();   // son corps cache les traits derrière lui
+  var rim = clamp((0.20 + 0.80 * Math.max(voiceEnv, guitEnv * 0.6)) * ease(clamp((vis - 0.12) / 0.3, 0, 1)) * (0.4 + 0.6 * vis) * lum * 1.25, 0, 0.8);
+  ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = rim; ctx.drawImage(headCv, 0, 0); ctx.globalAlpha = 1;
+  // un reflet glisse sur son crâne quand elle tourne la tête : c'est lui qui donne le volume
+  ctx.beginPath(); ctx.ellipse(HB.cx, 710, 640, 672, 0, Math.PI, Math.PI * 2); ctx.clip();
+  var sx = HB.cx - 150 - headYaw * 300, sy = 300 + headPitch * 90, sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, 430);
+  sg.addColorStop(0, 'rgba(255,255,255,' + (rim * 0.20).toFixed(3) + ')'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sg; ctx.fillRect(sx - 430, sy - 430, 860, 860);
+  ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
 }
 function drawEyesInv() {
   if (!headT.k) return;
-  var o = eye.open * ease(clamp((inv - 0.38) / 0.16, 0, 1)); if (eye.blink > 0) o *= Math.abs(eye.blink - 0.075) / 0.075 * 0.9 + 0.02;
+  var o = eye.open * ease(clamp((vis - 0.14) / 0.14, 0, 1)); if (eye.blink > 0) o *= Math.abs(eye.blink - 0.075) / 0.075 * 0.9 + 0.02;
   if (o < 0.004) return;
-  ctx.save(); ctx.setTransform(headT.k, 0, 0, headT.k, headT.x + headYaw * 26 * headT.k, headT.y);
+  var out = headT.out, conv = mind.target === 'pb' ? 0.16 : 0.05;            // vers le public, ses yeux convergent : elle nous regarde
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, W, headT.clip + 0.5); ctx.clip();
+  ctx.translate(headT.x + headYaw * 30 * headT.k, headT.y); ctx.rotate(headT.roll); ctx.scale(headT.k, headT.k); ctx.translate(-HB.cx, -HB.gy);
   for (var i = 0; i < 2; i++) {
-    var E = EYES[i], far = (i === 0 ? headYaw > 0 : headYaw < 0) ? 1 - 0.14 * Math.abs(headYaw) : 1;
-    drawEyeP({ cx: E.cx - HB.x, cy: E.cy - HB.y, rx: E.rx * far, ry: E.ry, g: [E.g[0] - HB.x, E.g[1] - HB.y, E.g[2] - HB.x, E.g[3] - HB.y], ix: E.ix - HB.x, iy: E.iy - HB.y }, o, eye.wide, eye.gx, eye.gy, 0, true);
+    var E = EYES[i], far = (i === 0 ? headYaw > 0 : headYaw < 0) ? 1 - 0.16 * Math.abs(headYaw) : 1 + 0.05 * Math.abs(headYaw);
+    var gyL = HB.gy + out * E.ry * 1.15;                                         // dedans : coupés net par le bord. Dehors : ils se découvrent
+    drawEyeP({ cx: E.cx - HB.x, cy: HB.gy, rx: E.rx * far, ry: E.ry, g: [E.cx - HB.x - 200, gyL, E.cx - HB.x + 200, gyL], ix: E.ix - HB.x, iy: HB.gy - 14 + out * 16 },
+      o, eye.wide, eye.gx + (i === 0 ? conv : -conv), eye.gy, 0, true);
   }
   ctx.restore();
 }
