@@ -188,7 +188,7 @@ var DEF = {
   twoCh: false, vSplit: 0.45, swap: false, gainV: 0, gainG: 0, thrV: -45, thrG: -45, bleed: 15,
   cxX: -0.6, cxY: 0.1, gtX: 0.6, gtY: 0.1, pbX: 0, pbY: 0.3, mouse: false,
   zoom: 0.85, frameY: 0, eyeBright: 0.95, speed: 1, sleepAfter: 8,
-  version: 'yeux', yeuxSize: 0.46, yeuxY: 0.50, amb: 1, maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
+  version: 'yeux', yeuxSize: 0.46, yeuxY: 0.50, yFly: false, ySil: false, amb: 1, maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
   duration: 240, autoEnd: false, simSound: true, remote: true, code: '', colL: '#f0f0f0', colY: '#fefe00', colG: '#1e6f4c'
 };
 var S = {};
@@ -493,7 +493,7 @@ function refreshLegend() {
   document.querySelector('#lgV i').style.width = Math.round(V.lvl * 100) + '%';
   document.querySelector('#lgG i').style.width = Math.round(G.lvl * 100) + '%';
   setText('lgVt', vOn ? (isYeux() ? 'Il parle : elle le regarde.' : isInv() ? 'Il parle : sa voix appelle la créature et attire les lucioles.' : 'Il parle. La lune respire, le dos de la créature affleure.') : 'Silencieux.');
-  setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isYeux() ? '. Une luciole naît et laisse deviner un peu de sa silhouette.' : isInv() ? '. Une luciole naît dans la boîte ; certaines sortent de l\'écran.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
+  setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isYeux() ? (S.yFly ? '. Une luciole naît.' : '. Elle regarde le musicien.') : isInv() ? '. Une luciole naît dans la boîte ; certaines sortent de l\'écran.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
   var look = !mind.awake ? 'Il dort.' : 'Il regarde ' + (mind.target === 'cx' ? 'le conteur' : mind.target === 'gt' ? 'le musicien' : mind.target === 'xy' ? 'où tu lui dis' : 'le public') + (T < mind.glanceUntil ? ' (coup d\'œil)' : '') + (eye.wide > 0.3 ? ', surpris' : '') + '.';
   if (isInv()) look = look.replace('Il regarde', 'Elle regarde').replace('Il dort.', 'Elle dort.').replace('surpris', 'surprise');
   if (isInv()) look = (inv < 0.05 ? 'Elle n\'est pas encore là.' : inv < 0.4 ? 'Quelque chose monte du fond.' : inv < 0.72 ? 'Elle avance vers la fenêtre.' : inv < 0.99 ? 'Elle passe la tête par la fenêtre.' : 'Elle est sortie.') + ' ' + look + '  (invocation : ' + Math.round(inv * 100) + ' %)';
@@ -653,7 +653,7 @@ function spawnFly(p, str) {
   if (flies.length > 30) flies.shift();
 }
 function trigger(name, str) {
-  if (isYeux()) { spawnFlyY(Math.random(), 0.8); spawnFlyY(Math.random(), 0.7); return; }
+  if (isYeux()) { if (S.yFly) { spawnFlyY(Math.random(), 0.8); spawnFlyY(Math.random(), 0.7); } return; }
   if (isInv()) { for (var q = 0; q < 4; q++) spawnFly3(Math.random(), 0.9); return; }
   str = str === undefined ? 0.8 : str;
   if (name === 'moon') fx.kMoon = 1;
@@ -666,7 +666,7 @@ function trigger(name, str) {
 }
 // Une note : une luciole, et un détail d'architecture selon sa hauteur
 function onNote(p, str) {
-  if (isYeux()) { spawnFlyY(p, str); if (str > 0.85) spawnFlyY(Math.random(), 0.8); return; }
+  if (isYeux()) { if (S.yFly) { spawnFlyY(p, str); if (str > 0.85) spawnFlyY(Math.random(), 0.8); } return; }
   if (isInv()) { if (g3) { spawnFly3(p, str); if (str > 0.85) { spawnFly3(Math.random(), 0.9); spawnFly3(Math.random(), 0.9); } } if (str > 0.85) flinch = Math.max(flinch, 0.16); glint.a = Math.max(glint.a, 0.35 + 0.65 * str); return; }
   if (S.lyFly) spawnFly(p, str);
   if (p < 0.34) { if (S.lyWin) trigger('win', str); }
@@ -760,7 +760,7 @@ function makeIris() {                       // l'iris de l'affiche : un vert cer
   var c = document.createElement('canvas'); c.width = c.height = 200; var g = c.getContext('2d'), i, a; seed = 9173;
   function wob(r, amp) { g.beginPath(); for (i = 0; i <= 40; i++) { a = i / 40 * Math.PI * 2; var rr = r + Math.sin(a * 3 + 1.3) * amp + Math.sin(a * 7 + 0.4) * amp * 0.5; if (i) g.lineTo(100 + Math.cos(a) * rr, 100 + Math.sin(a) * rr); else g.moveTo(100 + Math.cos(a) * rr, 100 + Math.sin(a) * rr); } g.closePath(); }
   g.fillStyle = '#050a07'; wob(84, 2.2); g.fill();
-  g.fillStyle = S.colG; wob(66, 1.8); g.fill();
+  g.fillStyle = '#8a8a8a'; wob(66, 1.8); g.fill();                           // noir et blanc : l'iris est gris
   for (i = 0; i < 260; i++) { a = srnd() * Math.PI * 2; var r = Math.sqrt(srnd()) * 62; g.fillStyle = 'rgba(0,0,0,' + (0.10 + srnd() * 0.22) + ')'; g.fillRect(100 + Math.cos(a) * r, 100 + Math.sin(a) * r, 1.6, 1.6); }
   g.fillStyle = '#000'; wob(28, 1.2); g.fill();
   g.fillStyle = '#f2f2f2'; g.beginPath(); g.arc(109, 93, 7, 0, 7); g.fill();
@@ -806,16 +806,16 @@ function drawYeux(dt, cap) {
     f.a = approach(f.a, tgt, dt, f.age < 0.3 ? 0.08 : 1.0);
     blob(f.x, f.y, 300 * f.r, f.a * lum * 0.85);
   }
-  if (domeCv) {
-    ctx.drawImage(domeCv, X + HB.x * k, Y + HB.y * k, HB.w * k, HB.h * k);
+  if (domeCv && S.ySil) {
+    ctx.filter = 'grayscale(1)'; ctx.drawImage(domeCv, X + HB.x * k, Y + HB.y * k, HB.w * k, HB.h * k); ctx.filter = 'none';
     ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(maskCv, 0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
   }
   ctx.globalCompositeOperation = 'lighter';
   for (i = 0; i < flies.length; i++) {
     var fl = flies[i], fa = fl.a * (0.35 + 0.65 * lum); if (fa < 0.01) continue;
     var sx = X + fl.x * k, sy = Y + fl.y * k, sr = Math.max(1.3, 6 * k * fl.r), gg = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr * 6);
-    gg.addColorStop(0, rgba(COL.light, fa * 0.35)); gg.addColorStop(1, rgba(COL.light, 0)); ctx.fillStyle = gg; ctx.fillRect(sx - sr * 6, sy - sr * 6, sr * 12, sr * 12);
-    ctx.fillStyle = rgba(COL.light, fa); ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    gg.addColorStop(0, 'rgba(255,255,255,' + (fa * 0.35).toFixed(3) + ')'); gg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = gg; ctx.fillRect(sx - sr * 6, sy - sr * 6, sr * 12, sr * 12);
+    ctx.fillStyle = 'rgba(255,255,255,' + fa.toFixed(3) + ')'; ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalCompositeOperation = 'source-over';
   // ses yeux
@@ -825,7 +825,7 @@ function drawYeux(dt, cap) {
   for (i = 0; i < 2; i++) {
     var E = sp[i], c = eyeCv[i]; if (!c) { c = eyeCv[i] = document.createElement('canvas'); c.width = eyeImg[i].width; c.height = eyeImg[i].height; }
     var g2 = c.getContext('2d'), s2 = c.width / E.w, ir = 44 * s2 * (1 - 0.08 * eye.wide);
-    g2.globalCompositeOperation = 'source-over'; g2.clearRect(0, 0, c.width, c.height); g2.drawImage(eyeImg[i], 0, 0);
+    g2.globalCompositeOperation = 'source-over'; g2.clearRect(0, 0, c.width, c.height); g2.filter = 'grayscale(1)'; g2.drawImage(eyeImg[i], 0, 0); g2.filter = 'none';
     g2.globalCompositeOperation = 'source-atop';                                 // l'iris reste à l'intérieur du blanc de l'œil
     var ixp = (E.ix - E.x + clamp(eye.gx, -1, 1) * (E.w * 0.5 - 50) * 0.72) * s2, iyp = (E.iy - E.y + clamp(eye.gy, -1, 1) * E.h * 0.30 - eye.wide * 8) * s2;
     g2.drawImage(irisCv, ixp - ir, iyp - ir, ir * 2, ir * 2);
@@ -1255,7 +1255,7 @@ function drawEyes() {
 var RELAY = 'https://ntfy.sh/';
 try { RELAY = localStorage.getItem('monstre-relay') || RELAY; } catch (e) {}
 var remote = { link: null, lastCmd: -99, lastPub: -99, dirty: false, key: '', ok: false };
-var DECOR = [['lyFly', 'Lucioles'], ['lyMoon', 'Lune'], ['lyBack', 'Son dos'], ['lyWin', 'Fenêtres'], ['lyStripe', 'Rayures'], ['lyAwn', 'Auvent'], ['lyWave', 'Onde pavés']];
+var DECOR = [['yFly', 'Yeux : lucioles'], ['ySil', 'Yeux : silhouette'], ['lyFly', 'Lucioles'], ['lyMoon', 'Lune'], ['lyBack', 'Son dos'], ['lyWin', 'Fenêtres'], ['lyStripe', 'Rayures'], ['lyAwn', 'Auvent'], ['lyWave', 'Onde pavés']];
 function topic(code, suffix) { return 'monstre-ecoute-' + code.toLowerCase() + suffix; }
 function newCode() { var a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = '', i; for (i = 0; i < 6; i++) c += a[Math.floor(Math.random() * a.length)]; return c; }
 function publish(code, suffix, obj) {
@@ -1484,7 +1484,9 @@ slider('sl-eyes', 'speed', 'Vivacité du regard', 0.4, 2, 0.05);
 slider('sl-eyes', 'sleepAfter', 'S\'endort après (s)', 3, 60, 1);
 slider('sl-decor', 'maxLum', 'Lumière maximale', 0, 1, 0.01);
 slider('sl-decor', 'reveal', 'Dévoilement (taille des lueurs)', 0.2, 1.6, 0.01);
-check('sl-decor', 'lyFly', 'Lucioles (chaque note)');
+check('sl-decor', 'yFly', 'Les yeux : lucioles blanches à chaque note');
+check('sl-decor', 'ySil', 'Les yeux : silhouette devinée par les lucioles');
+check('sl-decor', 'lyFly', 'La cour : lucioles (chaque note)');
 check('sl-decor', 'lyMoon', 'La lune respire (voix)');
 check('sl-decor', 'lyBack', 'Son dos affleure (voix)');
 check('sl-decor', 'lyWin', 'Fenêtres et portes (notes graves)');
