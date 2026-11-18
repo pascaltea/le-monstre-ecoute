@@ -63,7 +63,7 @@
 <canvas id="c"></canvas>
 
 <div id="start">
-  <div style="display:flex;gap:10px"><button id="bVy" style="min-width:0">Les yeux</button><button id="bVc" style="min-width:0">La cour dans le noir</button><button id="bVi" style="min-width:0">L'invocation</button></div>
+  <div style="display:flex;gap:10px"><button id="bVg" style="min-width:0">Les yeux animés</button><button id="bVy" style="min-width:0">Les yeux de l'affiche</button><button id="bVc" style="min-width:0">La cour dans le noir</button><button id="bVi" style="min-width:0">L'invocation</button></div>
   <button id="bAudio">Démarrer avec le micro de l'ordinateur</button>
   <button id="bSim">Simulation au clavier</button>
   <button id="bDemo">Démonstration guidée (45 s)</button>
@@ -82,7 +82,7 @@
     <h2>Performance</h2>
     <div class="g"><button class="big" data-c="start">Lancer la performance</button><button data-c="end">Lancer la fin</button><button data-c="reset">Remise à zéro</button></div>
     <h2>Version</h2>
-    <div class="g g3"><button data-ver="yeux" id="rgVy">Les yeux</button><button data-ver="cour" id="rgVc">La cour</button><button data-ver="inv" id="rgVi">L'invocation</button></div>
+    <div class="g"><button data-ver="gif" id="rgVg">Les yeux animés</button><button data-ver="yeux" id="rgVy">Les yeux de l'affiche</button><button data-ver="cour" id="rgVc">La cour</button><button data-ver="inv" id="rgVi">L'invocation</button></div>
     <div id="rgInvBox">
       <h2>Invocation</h2>
       <input type="range" id="rgInv" min="0" max="1" step="0.01" value="0">
@@ -188,7 +188,7 @@ var DEF = {
   twoCh: false, vSplit: 0.45, swap: false, gainV: 0, gainG: 0, thrV: -45, thrG: -45, bleed: 15,
   cxX: -0.6, cxY: 0.1, gtX: 0.6, gtY: 0.1, pbX: 0, pbY: 0.3, mouse: false,
   zoom: 0.85, frameY: 0, eyeBright: 0.95, speed: 1, sleepAfter: 8,
-  version: 'yeux', yeuxSize: 0.46, yeuxY: 0.50, yFly: false, ySil: false, amb: 1, maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
+  version: 'yeux', yeuxSize: 0.46, yeuxY: 0.50, yFly: false, ySil: false, gFly: true, gSil: true, gFps: 9, amb: 1, maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
   duration: 240, autoEnd: false, simSound: true, remote: true, code: '', colL: '#f0f0f0', colY: '#fefe00', colG: '#1e6f4c'
 };
 var S = {};
@@ -204,7 +204,10 @@ if (/[?&]cour\b/.test(location.search)) S.version = 'cour';
 (function () { var m = /[?&]amb=([123])/.exec(location.search); if (m) S.amb = parseInt(m[1], 10); })();
 if (/[?&]yeux\b/.test(location.search)) S.version = 'yeux';
 function isInv() { return S.version === 'inv'; }
+if (/[?&]anime\b/.test(location.search)) S.version = 'gif';
 function isYeux() { return S.version === 'yeux'; }
+function isGif() { return S.version === 'gif'; }
+function isSimple() { return isYeux() || isGif(); }
 
 // Les couleurs de l'affiche : blanc (yeux), jaune du titre (lucioles), vert (iris). Tout le reste vient du dessin lui-même.
 var COL = {};
@@ -492,8 +495,8 @@ function refreshLegend() {
   document.getElementById('lgRG').className = 'row' + (gOn ? ' on' : '');
   document.querySelector('#lgV i').style.width = Math.round(V.lvl * 100) + '%';
   document.querySelector('#lgG i').style.width = Math.round(G.lvl * 100) + '%';
-  setText('lgVt', vOn ? (isYeux() ? 'Il parle : elle le regarde.' : isInv() ? 'Il parle : sa voix appelle la créature et attire les lucioles.' : 'Il parle. La lune respire, le dos de la créature affleure.') : 'Silencieux.');
-  setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isYeux() ? (S.yFly ? '. Une luciole naît.' : '. Elle regarde le musicien.') : isInv() ? '. Une luciole naît dans la boîte ; certaines sortent de l\'écran.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
+  setText('lgVt', vOn ? (isSimple() ? 'Il parle : elle le regarde.' : isInv() ? 'Il parle : sa voix appelle la créature et attire les lucioles.' : 'Il parle. La lune respire, le dos de la créature affleure.') : 'Silencieux.');
+  setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isGif() ? '. Une luciole naît et laisse à peine deviner sa silhouette.' : isYeux() ? (S.yFly ? '. Une luciole naît.' : '. Elle regarde le musicien.') : isInv() ? '. Une luciole naît dans la boîte ; certaines sortent de l\'écran.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
   var look = !mind.awake ? 'Il dort.' : 'Il regarde ' + (mind.target === 'cx' ? 'le conteur' : mind.target === 'gt' ? 'le musicien' : mind.target === 'xy' ? 'où tu lui dis' : 'le public') + (T < mind.glanceUntil ? ' (coup d\'œil)' : '') + (eye.wide > 0.3 ? ', surpris' : '') + '.';
   if (isInv()) look = look.replace('Il regarde', 'Elle regarde').replace('Il dort.', 'Elle dort.').replace('surpris', 'surprise');
   if (isInv()) look = (inv < 0.05 ? 'Elle n\'est pas encore là.' : inv < 0.4 ? 'Quelque chose monte du fond.' : inv < 0.72 ? 'Elle avance vers la fenêtre.' : inv < 0.99 ? 'Elle passe la tête par la fenêtre.' : 'Elle est sortie.') + ' ' + look + '  (invocation : ' + Math.round(inv * 100) + ' %)';
@@ -510,7 +513,7 @@ var mouse = { x: 0, y: 0 };
 
 function targetPos(name) {
   if (name === 'xy') return [mind.fx || 0, mind.fy || 0];
-  if (name === 'pb' && isYeux()) name = mind.lastSpeaker || 'cx';        // version simple : elle ne regarde que le conteur ou le musicien
+  if (name === 'pb' && isSimple()) name = mind.lastSpeaker || 'cx';        // version simple : elle ne regarde que le conteur ou le musicien
   if (name === 'cx') return [S.cxX, S.cxY];
   if (name === 'gt') return [S.gtX, S.gtY];
   return [S.pbX, S.pbY];
@@ -653,6 +656,7 @@ function spawnFly(p, str) {
   if (flies.length > 30) flies.shift();
 }
 function trigger(name, str) {
+  if (isGif()) { spawnFlyY(Math.random(), 0.8); spawnFlyY(Math.random(), 0.7); return; }
   if (isYeux()) { if (S.yFly) { spawnFlyY(Math.random(), 0.8); spawnFlyY(Math.random(), 0.7); } return; }
   if (isInv()) { for (var q = 0; q < 4; q++) spawnFly3(Math.random(), 0.9); return; }
   str = str === undefined ? 0.8 : str;
@@ -666,6 +670,7 @@ function trigger(name, str) {
 }
 // Une note : une luciole, et un détail d'architecture selon sa hauteur
 function onNote(p, str) {
+  if (isGif()) { if (S.gFly) { spawnFlyY(p, str); if (str > 0.85) spawnFlyY(Math.random(), 0.8); } return; }
   if (isYeux()) { if (S.yFly) { spawnFlyY(p, str); if (str > 0.85) spawnFlyY(Math.random(), 0.8); } return; }
   if (isInv()) { if (g3) { spawnFly3(p, str); if (str > 0.85) { spawnFly3(Math.random(), 0.9); spawnFly3(Math.random(), 0.9); } } if (str > 0.85) flinch = Math.max(flinch, 0.16); glint.a = Math.max(glint.a, 0.35 + 0.65 * str); return; }
   if (S.lyFly) spawnFly(p, str);
@@ -836,6 +841,65 @@ function drawYeux(dt, cap) {
     if (e < 0.2) { ctx.fillStyle = '#f2f2f2'; crescent(dx0 + dw / 2, base - dh * 0.10 + Math.sin(T * 1.2) * dh * 0.008, dw * 0.82, dh * 0.07, dh * 0.035); }
     ctx.globalAlpha = 1;
   }
+}
+
+// ---------- Les yeux animés (ceux du GIF) ----------
+// Les yeux du GIF, exactement : un croissant quand ils dorment, une amande quand ils s'entrouvrent, un demi-disque à fond plat
+// quand ils sont ouverts, une pupille noire et son petit point blanc. Ils bougent par à-coups, image par image, comme un GIF.
+var gif = { t: 9, st: null, seed: 1 };
+function gifEye(cx, base, w, e, wide, gx, gy, sd) {
+  var es = smooth(e), t = 0.5 * w * e * (1 + 0.08 * wide) - (9 / 86) * w * (1 - e), b = (13 / 86) * w * Math.pow(1 - e, 1.5), N = 28, i, pts = [];
+  function jit(n) { return Math.sin(sd * 12.9898 + n * 78.233) * 0.5; }                       // le trait tremble un peu d'une image à l'autre
+  for (i = 0; i <= N; i++) { var u = -1 + 2 * i / N, pr = lerp(Math.cos(Math.PI * u / 2), Math.sqrt(Math.max(0, 1 - u * u)), es); pts.push([cx + u * w / 2, base - t * pr + jit(i) * w * 0.006]); }
+  for (i = N; i >= 0; i--) { var u2 = -1 + 2 * i / N; pts.push([cx + u2 * w / 2, base + b * Math.cos(Math.PI * u2 / 2) + jit(i + 40) * w * 0.004]); }
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,' + S.eyeBright + ')'; ctx.fill();
+  if (e < 0.10) return;
+  ctx.save(); ctx.clip();
+  var r = 0.122 * w * (1 - 0.10 * wide), hgt = Math.max(t, 0.01), px = cx + clamp(gx, -1, 1) * (w / 2 - r * 0.7) * 0.86, py = base - hgt * 0.42 + clamp(gy, -1, 1) * hgt * 0.50;
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px - r * 0.22, py - r * 0.42, r * 0.21, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function drawGif(dt, cap) {
+  var lum = cap * S.maxLum, i, k = S.yeuxSize * W / 1280, u = k * 514 / 167, base = S.yeuxY * H, X = W / 2 - 1238 * k, Y = base - 1562 * k;
+  if (!domeCv && posterOK) { try { bakeDome(); } catch (e0) {} }
+  voiceEnv = approach(voiceEnv, V.lvl, dt, V.lvl > voiceEnv ? 0.25 : 1.1);
+  guitEnv = approach(guitEnv, G.lvl, dt, G.lvl > guitEnv ? 0.1 : 0.9);
+  // les lucioles des notes, et la pénombre qu'elles ouvrent sur sa silhouette
+  var mw = Math.max(2, Math.round(W / 3)), mh = Math.max(2, Math.round(H / 3));
+  if (maskCv.width !== mw || maskCv.height !== mh) { maskCv.width = mw; maskCv.height = mh; }
+  mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.globalCompositeOperation = 'source-over'; mctx.fillStyle = '#000'; mctx.fillRect(0, 0, mw, mh);
+  mctx.setTransform(k / 3, 0, 0, k / 3, X / 3, Y / 3); mctx.globalCompositeOperation = 'lighter';
+  for (i = 0; i < flies.length; i++) {
+    var f = flies[i]; f.age += dt;
+    f.vx += rnd(-1, 1) * 30 * dt; f.vy += (rnd(-1, 1) * 30 - 2) * dt; f.vx *= Math.exp(-dt / 2.4); f.vy *= Math.exp(-dt / 2.4); f.x += f.vx * dt; f.y += f.vy * dt;
+    var tgt = f.age < 0.3 ? f.peak : f.age > f.life ? 0 : f.peak * (0.5 + 0.5 * clamp(guitEnv * 1.8, 0, 1)) * (0.8 + 0.2 * Math.sin(T * 2.1 + f.ph));
+    f.a = approach(f.a, tgt, dt, f.age < 0.3 ? 0.08 : 1.1);
+    blob(f.x, f.y, 300 * f.r, f.a * lum * 0.42);                                               // très léger
+  }
+  if (domeCv && S.gSil) {
+    ctx.filter = 'grayscale(1)'; ctx.drawImage(domeCv, X + HB.x * k, Y + HB.y * k, HB.w * k, HB.h * k); ctx.filter = 'none';
+    ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(maskCv, 0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  for (i = 0; i < flies.length; i++) {
+    var fl = flies[i], fa = fl.a * (0.3 + 0.7 * lum) * 0.8; if (fa < 0.01) continue;
+    var sx = X + fl.x * k, sy = Y + fl.y * k, sr = Math.max(1.2, 4.5 * k * fl.r), gg = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr * 6);
+    gg.addColorStop(0, 'rgba(255,255,255,' + (fa * 0.3).toFixed(3) + ')'); gg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = gg; ctx.fillRect(sx - sr * 6, sy - sr * 6, sr * 12, sr * 12);
+    ctx.fillStyle = 'rgba(255,255,255,' + fa.toFixed(3) + ')'; ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  // l'effet GIF : la pose n'est relevée que quelques fois par seconde, puis tenue
+  gif.t += dt;
+  if (!gif.st || gif.t >= 1 / Math.max(2, S.gFps)) {
+    gif.t = 0; gif.seed = (gif.seed * 7 + 3) % 97;
+    var o = eye.open; if (eye.blink > 0) o *= 0.08;
+    gif.st = { o: o, gx: eye.gx, gy: eye.gy, wide: eye.wide, sd: gif.seed };
+  }
+  var s = gif.st, w = 86 * u, br = Math.sin(T * 1.2) * w * 0.006 * (1 - s.o);
+  gifEye(W / 2 - 83.5 * u, base + br, w, s.o, s.wide, s.gx, s.gy, s.sd);
+  gifEye(W / 2 + 83.5 * u, base + br, w, s.o, s.wide, s.gx, s.gy, s.sd + 5);
 }
 
 // ---------- L'invocation (version noir et blanc) ----------
@@ -1255,7 +1319,7 @@ function drawEyes() {
 var RELAY = 'https://ntfy.sh/';
 try { RELAY = localStorage.getItem('monstre-relay') || RELAY; } catch (e) {}
 var remote = { link: null, lastCmd: -99, lastPub: -99, dirty: false, key: '', ok: false };
-var DECOR = [['yFly', 'Yeux : lucioles'], ['ySil', 'Yeux : silhouette'], ['lyFly', 'Lucioles'], ['lyMoon', 'Lune'], ['lyBack', 'Son dos'], ['lyWin', 'Fenêtres'], ['lyStripe', 'Rayures'], ['lyAwn', 'Auvent'], ['lyWave', 'Onde pavés']];
+var DECOR = [['gFly', 'Animés : lucioles'], ['gSil', 'Animés : silhouette'], ['yFly', 'Affiche : lucioles'], ['ySil', 'Affiche : silhouette'], ['lyFly', 'Lucioles'], ['lyMoon', 'Lune'], ['lyBack', 'Son dos'], ['lyWin', 'Fenêtres'], ['lyStripe', 'Rayures'], ['lyAwn', 'Auvent'], ['lyWave', 'Onde pavés']];
 function topic(code, suffix) { return 'monstre-ecoute-' + code.toLowerCase() + suffix; }
 function newCode() { var a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = '', i; for (i = 0; i < 6; i++) c += a[Math.floor(Math.random() * a.length)]; return c; }
 function publish(code, suffix, obj) {
@@ -1284,7 +1348,7 @@ function doCmd(c, v) {
   else if (c === 'wide') eye.wide = 1;
   else if (c === 'fx') { if (['moon', 'back', 'win', 'stripe', 'awn', 'wave', 'fly'].indexOf(v) >= 0) trigger(v); }
   else if (c === 'inv') { invForce = v === 'auto' ? null : clamp(parseFloat(v) || 0, 0, 1); if (invForce !== null && invForce > 0.3) wake(); }
-  else if (c === 'version') { S.version = v === 'inv' ? 'inv' : v === 'cour' ? 'cour' : 'yeux'; saveS(); syncStart(); }
+  else if (c === 'version') { S.version = v === 'inv' ? 'inv' : v === 'cour' ? 'cour' : v === 'gif' ? 'gif' : 'yeux'; saveS(); syncStart(); }
   else if (c === 'reveal') { S.reveal = clamp(parseFloat(v) || 0.55, 0.2, 1.6); saveS(); syncPanel(); }
   else if (c === 'lum') { S.maxLum = clamp(parseFloat(v) || 0, 0, 1); saveS(); syncPanel(); }
   else if (c === 'toggle') { var ok = DECOR.some(function (d) { return d[0] === v; }); if (ok) { S[v] = !S[v]; saveS(); syncPanel(); } }
@@ -1347,7 +1411,7 @@ function regiePage() {
       Array.prototype.forEach.call(dec.children, function (b) { b.className = st.d[b.getAttribute('data-t')] ? 'on' : ''; });
       if (document.activeElement !== document.getElementById('rgLum')) document.getElementById('rgLum').value = st.lum;
       if (st.rv && document.activeElement !== document.getElementById('rgRev')) document.getElementById('rgRev').value = st.rv;
-      document.getElementById('rgVy').className = st.ver === 'yeux' ? 'on' : ''; document.getElementById('rgVc').className = st.ver === 'cour' ? 'on' : ''; document.getElementById('rgVi').className = st.ver === 'inv' ? 'on' : '';
+      document.getElementById('rgVg').className = st.ver === 'gif' ? 'on' : ''; document.getElementById('rgVy').className = st.ver === 'yeux' ? 'on' : ''; document.getElementById('rgVc').className = st.ver === 'cour' ? 'on' : ''; document.getElementById('rgVi').className = st.ver === 'inv' ? 'on' : '';
       document.getElementById('rgInvBox').style.display = st.ver === 'inv' ? 'block' : 'none'; document.getElementById('rgInvAuto').className = st.invA ? 'on' : '';
       if (document.activeElement !== document.getElementById('rgInv')) document.getElementById('rgInv').value = (st.inv || 0) / 100;
       document.getElementById('rgHint').textContent = st.mic ? 'La scène écoute le micro.' : 'La scène est en simulation (pas de micro).';
@@ -1419,6 +1483,7 @@ function frame(ms) {
     if (now - grainT > 0.07) { grainT = now; grainOff = [Math.floor(Math.random() * 256), Math.floor(Math.random() * 256)]; }
     ctx.save(); ctx.translate(grainOff[0], grainOff[1]); ctx.fillStyle = grainP2; ctx.fillRect(-256, -256, W + 256, H + 256); ctx.restore();
   }
+  else if (isGif()) { drawGif(dt, lightCap()); }
   else if (isYeux()) { drawYeux(dt, lightCap()); }
   else if (isInv()) { layout(); drawInvocation(dt, lightCap()); drawEyesInv(); } else { drawScene(dt, lightCap());
   drawEyes(); }
@@ -1484,8 +1549,11 @@ slider('sl-eyes', 'speed', 'Vivacité du regard', 0.4, 2, 0.05);
 slider('sl-eyes', 'sleepAfter', 'S\'endort après (s)', 3, 60, 1);
 slider('sl-decor', 'maxLum', 'Lumière maximale', 0, 1, 0.01);
 slider('sl-decor', 'reveal', 'Dévoilement (taille des lueurs)', 0.2, 1.6, 0.01);
-check('sl-decor', 'yFly', 'Les yeux : lucioles blanches à chaque note');
-check('sl-decor', 'ySil', 'Les yeux : silhouette devinée par les lucioles');
+check('sl-decor', 'gFly', 'Yeux animés : une luciole à chaque note');
+check('sl-decor', 'gSil', 'Yeux animés : silhouette devinée dans la pénombre');
+slider('sl-decor', 'gFps', 'Yeux animés : images par seconde', 3, 30, 1);
+check('sl-decor', 'yFly', 'Yeux de l\'affiche : lucioles blanches à chaque note');
+check('sl-decor', 'ySil', 'Yeux de l\'affiche : silhouette devinée par les lucioles');
 check('sl-decor', 'lyFly', 'La cour : lucioles (chaque note)');
 check('sl-decor', 'lyMoon', 'La lune respire (voix)');
 check('sl-decor', 'lyBack', 'Son dos affleure (voix)');
@@ -1548,8 +1616,9 @@ function begin(withAudio) {
   document.body.classList.add('nocursor');
   if (withAudio) connect(null);
 }
-function syncStart() { document.getElementById('bVy').style.borderColor = isYeux() ? '#fefe00' : '#444'; document.getElementById('bVc').style.borderColor = S.version === 'cour' ? '#fefe00' : '#444'; document.getElementById('bVi').style.borderColor = isInv() ? '#fff' : '#444'; }
+function syncStart() { document.getElementById('bVg').style.borderColor = isGif() ? '#fff' : '#444'; document.getElementById('bVy').style.borderColor = isYeux() ? '#fff' : '#444'; document.getElementById('bVc').style.borderColor = S.version === 'cour' ? '#fefe00' : '#444'; document.getElementById('bVi').style.borderColor = isInv() ? '#fff' : '#444'; }
 document.getElementById('bVy').onclick = function () { S.version = 'yeux'; saveS(); syncStart(); };
+document.getElementById('bVg').onclick = function () { S.version = 'gif'; saveS(); syncStart(); };
 document.getElementById('bVc').onclick = function () { S.version = 'cour'; saveS(); syncStart(); };
 document.getElementById('bVi').onclick = function () { S.version = 'inv'; saveS(); syncStart(); };
 syncStart();
