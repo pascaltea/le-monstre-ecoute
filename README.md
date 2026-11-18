@@ -9,7 +9,7 @@ Tout tourne dans le navigateur (Chrome recommandé), sans serveur. Le micro sert
 ## Deux versions
 
 - **La cour dans le noir** (adresse du site) : le dessin de l'affiche, en couleurs, révélé par fragments.
-- **L'invocation** (`invocation.html`) : noir et blanc. Une fenêtre tracée au trait, avec sa profondeur. La musique appelle la créature : elle monte du fond, avance, ouvre les yeux, puis sort la tête au-delà du cadre pour regarder le conteur, la guitare et le public. Chaque note fait vibrer un trait de la fenêtre comme une corde.
+- **L'invocation** (`invocation.html`) : noir et blanc, en 3D. Un mur noir percé d'une fenêtre, une boîte derrière. La musique appelle la créature : elle monte du fond, s'approche, passe la tête par la fenêtre, puis la lève au-dessus du cadre et la penche vers le conteur, la guitare et le public. Chaque note est une luciole ; la voix les attire, certaines sortent de l'écran.
 
 La version se choisit aussi sur l'écran de départ et depuis la régie.
 
@@ -26,4 +26,4 @@ Dans les réglages de la scène, scanner le QR code (ou ouvrir l'adresse termin�
 
 ## Crédits
 
-Illustration de l'affiche : Assemblée créative de Genève, Downtown Studio. Bibliothèques : MQTT.js (voir `vendor/LICENSE-mqtt.md`), qrcode-generator.
+Illustration de l'affiche : Assemblée créative de Genève, Downtown Studio. Bibliothèques : three.js (voir `vendor/LICENSE-three.txt`), MQTT.js (voir `vendor/LICENSE-mqtt.md`), qrcode-generator.

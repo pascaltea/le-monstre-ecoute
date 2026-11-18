@@ -7,6 +7,8 @@
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; background: #000; }
+  #gl { position: fixed; left: 0; top: 0; z-index: 0; display: none; }
+  #c { position: relative; z-index: 1; }
   body.nocursor, body.nocursor canvas { cursor: none; }
   #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
     background: #000; color: #8a8a8a; font: 15px/1.4 Georgia, serif; z-index: 5; }
@@ -57,6 +59,7 @@
 </style>
 </head>
 <body>
+<canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 
 <div id="start">
@@ -486,8 +489,8 @@ function refreshLegend() {
   document.getElementById('lgRG').className = 'row' + (gOn ? ' on' : '');
   document.querySelector('#lgV i').style.width = Math.round(V.lvl * 100) + '%';
   document.querySelector('#lgG i').style.width = Math.round(G.lvl * 100) + '%';
-  setText('lgVt', vOn ? (isInv() ? 'Il parle : sa voix appelle la créature, elle avance.' : 'Il parle. La lune respire, le dos de la créature affleure.') : 'Silencieux.');
-  setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isInv() ? '. Un trait de la fenêtre vibre comme une corde, la créature avance.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
+  setText('lgVt', vOn ? (isInv() ? 'Il parle : sa voix appelle la créature et attire les lucioles.' : 'Il parle. La lune respire, le dos de la créature affleure.') : 'Silencieux.');
+  setText('lgGt', gOn ? 'Note : ' + lastNote.name + (isInv() ? '. Une luciole naît dans la boîte ; certaines sortent de l\'écran.' : '. Une luciole naît et éclaire un fragment du dessin' + (lastNote.zone || '') + '.') : 'Silencieuse.');
   var look = !mind.awake ? 'Il dort.' : 'Il regarde ' + (mind.target === 'cx' ? 'le conteur' : mind.target === 'gt' ? 'la guitare' : mind.target === 'xy' ? 'où tu lui dis' : 'le public') + (T < mind.glanceUntil ? ' (coup d\'œil)' : '') + (eye.wide > 0.3 ? ', surpris' : '') + '.';
   if (isInv()) look = look.replace('Il regarde', 'Elle regarde').replace('Il dort.', 'Elle dort.').replace('surpris', 'surprise');
   if (isInv()) look = (inv < 0.05 ? 'Elle n\'est pas encore là.' : inv < 0.4 ? 'Quelque chose monte du fond.' : inv < 0.72 ? 'Elle avance vers la fenêtre.' : inv < 0.99 ? 'Elle passe la tête par la fenêtre.' : 'Elle est sortie.') + ' ' + look + '  (invocation : ' + Math.round(inv * 100) + ' %)';
@@ -646,7 +649,7 @@ function spawnFly(p, str) {
   if (flies.length > 30) flies.shift();
 }
 function trigger(name, str) {
-  if (isInv()) { pluck(Math.floor(Math.random() * 12), 0.9); return; }
+  if (isInv()) { for (var q = 0; q < 4; q++) spawnFly3(Math.random(), 0.9); return; }
   str = str === undefined ? 0.8 : str;
   if (name === 'moon') fx.kMoon = 1;
   else if (name === 'back') fx.kBack = 1;
@@ -658,7 +661,7 @@ function trigger(name, str) {
 }
 // Une note : une luciole, et un détail d'architecture selon sa hauteur
 function onNote(p, str) {
-  if (isInv()) { pluck(Math.floor(p * 11.99), str); if (str > 0.85) { pluck(0, 1); pluck(2, 1); flinch = Math.max(flinch, 0.16); } glint.a = Math.max(glint.a, 0.35 + 0.65 * str); return; }
+  if (isInv()) { if (g3) { spawnFly3(p, str); if (str > 0.85) { spawnFly3(Math.random(), 0.9); spawnFly3(Math.random(), 0.9); } } if (str > 0.85) flinch = Math.max(flinch, 0.16); glint.a = Math.max(glint.a, 0.35 + 0.65 * str); return; }
   if (S.lyFly) spawnFly(p, str);
   if (p < 0.34) { if (S.lyWin) trigger('win', str); }
   else if (p > 0.66) { if (S.lyAwn) trigger('awn', str); }
@@ -771,8 +774,7 @@ function invCap() {
   return clamp(0.12 + 0.88 * smooth(perf.t / (S.duration * 0.62)), 0, 1);
 }
 function ease(t) { return t * t * (3 - 2 * t); }
-function drawInvocation(dt, cap) {
-  var lum = cap * S.maxLum, i;
+function invDynamics(dt) {
   voiceEnv = approach(voiceEnv, V.lvl, dt, V.lvl > voiceEnv ? 0.25 : 1.1);
   guitEnv = approach(guitEnv, G.lvl, dt, G.lvl > guitEnv ? 0.1 : 0.9);
   // La musique l'appelle ; le silence le laisse repartir, lentement
@@ -793,11 +795,15 @@ function drawInvocation(dt, cap) {
   headPitch = approach(headPitch, mind.awake ? eye.gy : 0, dt, 0.6);
   headRoll = approach(headRoll, headYaw * 0.085 + curious + Math.sin(T * 0.37) * 0.012, dt, 0.45);
 
+}
+function drawInvocation(dt, cap) {
+  var lum = cap * S.maxLum, i;
+  invDynamics(dt);
   var d = ease(clamp(vis / 0.70, 0, 1)), out = ease(clamp((vis - 0.70) / 0.30, 0, 1)), rise = ease(clamp(vis / 0.26, 0, 1));
 
   // La fenêtre et sa profondeur. Le fond glisse à l'opposé de sa tête : c'est ce décalage qui creuse la boîte.
   var Hh = Math.min(H, W / 1.6), ww = Hh * 0.92, wh = ww * 0.5, x0 = W / 2 - ww / 2, x1 = W / 2 + ww / 2, y1 = H * 0.70, y0 = y1 - wh;
-  var bs = 0.44, bcx = W / 2 - headYaw * ww * 0.035 + Math.sin(T * 0.21) * ww * 0.006, bcy = y0 + wh * 0.46 - headPitch * wh * 0.02;
+  var bs = 0.44, bcx = W / 2, bcy = y0 + wh * 0.46;
   var bx0 = bcx - ww * bs / 2, bx1 = bcx + ww * bs / 2, by0 = bcy - wh * bs / 2, by1 = bcy + wh * bs / 2;
   // Le sol de la boîte reçoit un peu de lumière : sa silhouette s'y découpe quand elle approche
   var fl = lum * (0.03 + 0.07 * vis);
@@ -811,9 +817,9 @@ function drawInvocation(dt, cap) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (i = 0; i < 12; i++) {
     var st = strings[i], ln = L[i]; st.ph += dt * st.f; st.amp *= Math.exp(-dt / 0.9); st.glow *= Math.exp(-dt / 1.4);
-    var front = i < 4, base = (front ? 0.24 + 0.40 * inv : 0.09 + 0.16 * inv) * lum, al = clamp(base + st.glow * 0.6 * (0.35 + 0.65 * lum), 0, 1);
+    var front = i < 4, base = (front ? 0.24 + 0.40 * inv : 0.09 + 0.16 * inv) * lum, al = clamp(base, 0, 1);
     if (al < 0.006) continue;
-    var dxl = ln[2] - ln[0], dyl = ln[3] - ln[1], len = Math.sqrt(dxl * dxl + dyl * dyl) || 1, nx = -dyl / len, ny = dxl / len, a = st.amp * Hh * 0.011 * Math.sin(st.ph), j;
+    var dxl = ln[2] - ln[0], dyl = ln[3] - ln[1], len = Math.sqrt(dxl * dxl + dyl * dyl) || 1, nx = -dyl / len, ny = dxl / len, a = 0, j;
     ctx.strokeStyle = 'rgba(255,255,255,' + al.toFixed(3) + ')'; ctx.lineWidth = Math.max(1, Hh * (front ? 0.0026 : 0.0016)); ctx.beginPath();
     for (j = 0; j <= 24; j++) { var u = j / 24, w = Math.sin(Math.PI * u) * a; if (j) ctx.lineTo(ln[0] + dxl * u + nx * w, ln[1] + dyl * u + ny * w); else ctx.moveTo(ln[0] + dxl * u + nx * w, ln[1] + dyl * u + ny * w); }
     ctx.stroke();
@@ -860,6 +866,150 @@ function drawEyesInv() {
       o, eye.wide, eye.gx + (i === 0 ? conv : -conv), eye.gy, 0, true);
   }
   ctx.restore();
+}
+
+// ---------- L'invocation en vraie 3D ----------
+// Une boîte creusée derrière l'écran, un mur percé d'une fenêtre, une créature modelée en volume. La caméra ne bouge jamais :
+// seul ce qui franchit le plan de la fenêtre peut dépasser du cadre. Les notes sont des lucioles ; certaines sortent aussi.
+var T3 = null, g3 = null, R3 = 0.42, D3 = 1.7, NF = 48;
+function load3D() {
+  var srcs = ['./vendor/three.module.js', 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js'];
+  function tryAt(i) { if (i >= srcs.length) return Promise.reject(new Error('3D indisponible')); return import(srcs[i]).catch(function () { return tryAt(i + 1); }); }
+  tryAt(/^https?:/.test(location.protocol) ? 0 : 1).then(function (m) { T3 = m; try { build3D(); } catch (e) { g3 = null; } }).catch(function () {});
+}
+function stippleTex() {
+  var c = document.createElement('canvas'); c.width = c.height = 256; var g = c.getContext('2d'), i;
+  g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256);
+  for (i = 0; i < 5200; i++) { var v = 120 + Math.floor(Math.random() * 135); g.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')'; g.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 1.4, 1 + Math.random() * 1.4); }
+  var t = new T3.CanvasTexture(c); t.wrapS = t.wrapT = T3.RepeatWrapping; t.repeat.set(7, 4); return t;
+}
+function eyeTex() {
+  var c = document.createElement('canvas'); c.width = 512; c.height = 256; var g = c.getContext('2d'), x = 128, y = 128;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, 34, 0, 7); g.fill();
+  g.fillStyle = '#8a8a8a'; g.beginPath(); g.arc(x, y, 28, 0, 7); g.fill();
+  g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, 13, 0, 7); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(x + 5, y - 5, 3.5, 0, 7); g.fill();
+  return new T3.CanvasTexture(c);
+}
+function dotTex() {
+  var c = document.createElement('canvas'); c.width = c.height = 64; var g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.18, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T3.CanvasTexture(c);
+}
+function build3D() {
+  var THREE = T3, o = {}, i;
+  o.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true });
+  o.renderer.setClearColor(0x000000, 1);
+  o.scene = new THREE.Scene();
+  o.cam = new THREE.PerspectiveCamera(39.5, 16 / 9, 0.1, 40); o.cam.position.set(0, 0.46, 3.2); o.cam.lookAt(0, 0.46, 0);
+  // la boîte, derrière l'écran
+  var box = new THREE.Mesh(new THREE.BoxGeometry(2, 1, D3), new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 1, metalness: 0, side: THREE.BackSide }));
+  box.position.set(0, 0.5, -D3 / 2); o.scene.add(box);
+  // le mur de l'écran, noir, percé de la fenêtre : tout ce qui est derrière lui est caché
+  var sh = new THREE.Shape(); sh.moveTo(-12, -9); sh.lineTo(12, -9); sh.lineTo(12, 9); sh.lineTo(-12, 9); sh.lineTo(-12, -9);
+  var hole = new THREE.Path(); hole.moveTo(-1, 0); hole.lineTo(-1, 1); hole.lineTo(1, 1); hole.lineTo(1, 0); hole.lineTo(-1, 0); sh.holes.push(hole);
+  o.scene.add(new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: 0x000000 })));
+  // le cadre, au trait
+  o.frameMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+  o.scene.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-1, 0, 0.004), new THREE.Vector3(1, 0, 0.004), new THREE.Vector3(1, 1, 0.004), new THREE.Vector3(-1, 1, 0.004)]), o.frameMat));
+  o.edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 });
+  var z = -D3, P = function (x, y, zz) { return new THREE.Vector3(x, y, zz); };
+  o.scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([P(-1, 0, z), P(1, 0, z), P(1, 0, z), P(1, 1, z), P(1, 1, z), P(-1, 1, z), P(-1, 1, z), P(-1, 0, z),
+    P(-1, 0, 0), P(-1, 0, z), P(1, 0, 0), P(1, 0, z), P(1, 1, 0), P(1, 1, z), P(-1, 1, 0), P(-1, 1, z)]), o.edgeMat));
+  // la créature
+  var skin = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, map: stippleTex(), roughness: 1, metalness: 0 });
+  o.head = new THREE.Mesh(new THREE.SphereGeometry(R3, 64, 40), skin); o.head.scale.set(1, 0.96, 1); o.scene.add(o.head);
+  o.body = new THREE.Mesh(new THREE.SphereGeometry(0.60, 48, 32), skin); o.scene.add(o.body);
+  o.neck = new THREE.Mesh(new THREE.CylinderGeometry(R3 * 0.80, R3 * 1.0, 1, 40, 1, true), skin); o.scene.add(o.neck);
+  var et = eyeTex(), em = new THREE.MeshBasicMaterial({ map: et, color: 0xffffff }); o.eyeMat = em; o.eyes = [];
+  for (i = 0; i < 2; i++) {
+    var sg = i === 0 ? -1 : 1, ya = 0.42 * sg, pa = -0.20, grp = new THREE.Group();
+    grp.position.set(Math.sin(ya) * Math.cos(pa) * R3 * 0.84, Math.sin(pa) * R3 * 0.84, Math.cos(ya) * Math.cos(pa) * R3 * 0.84);
+    var ball = new THREE.Mesh(new THREE.SphereGeometry(R3 * 0.27, 40, 28), em); grp.add(ball); o.head.add(grp); o.eyes.push({ grp: grp, ball: ball });
+  }
+  // la lumière : presque rien. La voix l'éclaire, les lucioles la frôlent.
+  o.amb = new THREE.AmbientLight(0xffffff, 0.02); o.scene.add(o.amb);
+  o.key = new THREE.DirectionalLight(0xffffff, 0); o.key.position.set(-1.6, 2.6, 1.6); o.scene.add(o.key);
+  o.rimL = new THREE.PointLight(0xffffff, 0, 0, 2); o.rimL.position.set(-0.75, 0.62, -0.25); o.scene.add(o.rimL);
+  o.fl = []; for (i = 0; i < 3; i++) { var pl = new THREE.PointLight(0xffffff, 0, 0, 2); o.scene.add(pl); o.fl.push(pl); }
+  // les lucioles
+  o.fpos = new Float32Array(NF * 3); o.fcol = new Float32Array(NF * 3); o.flies = [];
+  for (i = 0; i < NF; i++) o.flies.push({ a: 0, life: 0, age: 9, x: 0, y: -5, z: 0, vx: 0, vy: 0, vz: 0, out: false, peak: 0, tx: 0, ty: 0, tz: 0, ph: 0 });
+  var fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(o.fpos, 3)); fg.setAttribute('color', new THREE.BufferAttribute(o.fcol, 3));
+  o.fgeo = fg;
+  o.fpts = new THREE.Points(fg, new THREE.PointsMaterial({ size: 0.17, map: dotTex(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
+  o.fpts.frustumCulled = false; o.scene.add(o.fpts);
+  o.hp = new THREE.Vector3(0, -1, -1.2); o.tmp = new THREE.Vector3(); o.up = new THREE.Vector3(0, 1, 0); o.w = 0; o.h = 0;
+  g3 = o;
+}
+function spawnFly3(p, str) {
+  if (!g3) return;
+  var best = g3.flies[0], i; for (i = 0; i < NF; i++) { var f = g3.flies[i]; if (f.age >= f.life) { best = f; break; } if (f.a < best.a) best = f; }
+  best.x = rnd(-0.85, 0.85); best.y = 0.10 + p * 0.74 + rnd(-0.05, 0.05); best.z = rnd(-D3 + 0.25, -0.25);
+  best.vx = rnd(-0.05, 0.05); best.vy = rnd(-0.02, 0.06); best.vz = rnd(-0.03, 0.05);
+  best.out = str > 0.8 || Math.random() < 0.38; best.peak = 0.45 + 0.55 * str; best.age = 0; best.life = rnd(4.5, 7.5); best.a = 0; best.ph = rnd(0, 6);
+  best.tx = best.x * rnd(1.6, 2.4); best.ty = best.y * 1.5 + rnd(0.1, 0.6); best.tz = rnd(0.7, 1.9);          // où elle ira si elle sort de l'écran
+}
+function render3D(dt, cap) {
+  var o = g3, THREE = T3, lum = cap * S.maxLum, i;
+  var w = window.innerWidth, h = window.innerHeight;
+  if (w !== o.w || h !== o.h) { o.w = w; o.h = h; o.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); o.renderer.setSize(w, h, false); o.cam.aspect = w / h; o.cam.updateProjectionMatrix(); }
+  invDynamics(dt);
+
+  // Son chemin : elle monte du fond, s'approche, passe la tête par la fenêtre, puis la lève et la penche vers nous
+  var a = ease(clamp(vis / 0.28, 0, 1)), b = ease(clamp((vis - 0.28) / 0.40, 0, 1)), c = ease(clamp((vis - 0.68) / 0.17, 0, 1)), e = ease(clamp((vis - 0.85) / 0.15, 0, 1));
+  var y = -1.25 * R3 + 2.05 * R3 * a, z = -D3 * 0.72;
+  y = lerp(y, 0.50, b); z = lerp(z, -1.18 * R3, b);
+  y = lerp(y, 0.53, c); z = lerp(z, 1.10 * R3, c);
+  y = lerp(y, 0.84, e); z = lerp(z, 1.42 * R3, e);
+  var walk = Math.sin(vis * 46) * b * (1 - b) * 4, x = headYaw * (0.05 + 0.22 * e) + walk * 0.012;
+  y += Math.sin(T * 1.05) * 0.006;
+  o.hp.set(x, y, z); o.head.position.copy(o.hp);
+  o.head.rotation.set(e * 0.50 + c * 0.10 + headPitch * 0.10, headYaw * (0.25 + 0.25 * e), -(headRoll * 0.8 + walk * 0.02), 'YXZ');
+  var bx = x * 0.3, by = lerp(-0.95, -0.12, a), bz = clamp(z - 0.62, -D3 + 0.62, -0.66);
+  o.body.position.set(bx, by, bz);
+  o.tmp.set(x - bx, y - (by + 0.2), z - bz); var nl = o.tmp.length() || 0.001;
+  o.neck.position.set((x + bx) / 2, (y + by + 0.2) / 2, (z + bz) / 2); o.neck.scale.set(1, nl, 1); o.neck.quaternion.setFromUnitVectors(o.up, o.tmp.normalize());
+  var vis3 = vis > 0.01; o.head.visible = o.body.visible = o.neck.visible = vis3;
+
+  // Ses yeux visent vraiment ceux qu'elle regarde, dans la salle
+  var op = eye.open * ease(clamp((vis - 0.14) / 0.14, 0, 1)); if (eye.blink > 0) op *= Math.abs(eye.blink - 0.075) / 0.075 * 0.9 + 0.02;
+  var far = mind.target === 'pb' ? 6 : 2.6, gxw = eye.gx * 2.7, gyw = 0.30 - (eye.gy + 0.45) * 1.5;
+  for (i = 0; i < 2; i++) {
+    var E = o.eyes[i]; E.grp.scale.set(1 + 0.08 * eye.wide, Math.max(0.03, op) * (1 + 0.08 * eye.wide), 1); E.grp.visible = op > 0.01;
+    o.tmp.set(gxw, gyw, far); E.ball.lookAt(o.tmp);
+  }
+  o.eyeMat.color.setScalar(S.eyeBright);
+
+  // La lumière
+  var act = Math.max(voiceEnv, guitEnv * 0.5), pres = ease(clamp((vis - 0.10) / 0.3, 0, 1));
+  o.key.intensity = (0.10 + 0.90 * act) * pres * lum * 2.6 * (0.35 + 0.65 * (c + e) / 2 + 0.2);
+  o.rimL.intensity = (0.15 + 0.85 * act) * pres * lum * 0.16;
+  o.amb.intensity = 0.012 * lum;
+  o.frameMat.opacity = clamp((0.26 + 0.42 * inv) * lum, 0, 1); o.edgeMat.opacity = clamp((0.07 + 0.11 * inv) * lum, 0, 1);
+
+  // Les lucioles : chaque note en fait naître une. La voix les attire vers elle. Certaines sortent de l'écran.
+  var top = [null, null, null];
+  for (i = 0; i < NF; i++) {
+    var f = o.flies[i]; f.age += dt;
+    if (f.age < f.life) {
+      var ax = rnd(-1, 1) * 0.25, ay = rnd(-1, 1) * 0.25, az = rnd(-1, 1) * 0.25;
+      if (f.out && f.age > 1.1) { ax += (f.tx - f.x) * 0.55; ay += (f.ty - f.y) * 0.55; az += (f.tz - f.z) * 0.55; }
+      else if (vis3 && voiceEnv > 0.05) { var dx = x - f.x, dy = y + 0.1 - f.y, dz = z - f.z, dd = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1, pull = voiceEnv * 0.45 * (dd > R3 * 1.5 ? 1 : -1.2); ax += dx / dd * pull - dz / dd * 0.25 * voiceEnv; ay += dy / dd * pull; az += dz / dd * pull + dx / dd * 0.25 * voiceEnv; }
+      f.vx += ax * dt; f.vy += ay * dt; f.vz += az * dt; var dmp = Math.exp(-dt / 1.3); f.vx *= dmp; f.vy *= dmp; f.vz *= dmp;
+      f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt;
+      if (!f.out || f.age <= 1.1) { f.x = clamp(f.x, -0.95, 0.95); f.y = clamp(f.y, 0.04, 0.96); f.z = clamp(f.z, -D3 + 0.05, -0.04); }
+      var tg = f.age < 0.3 ? f.peak : f.age > f.life - 1.5 ? 0 : f.peak * (0.55 + 0.45 * clamp(guitEnv * 1.8, 0, 1)) * (0.78 + 0.22 * Math.sin(T * 2.4 + f.ph));
+      f.a = approach(f.a, tg, dt, f.age < 0.3 ? 0.07 : 0.8);
+    } else f.a = approach(f.a, 0, dt, 0.4);
+    var va = Math.min(1, f.a * (0.45 + 0.75 * lum));
+    o.fpos[i * 3] = f.x; o.fpos[i * 3 + 1] = f.y; o.fpos[i * 3 + 2] = f.z; o.fcol[i * 3] = o.fcol[i * 3 + 1] = o.fcol[i * 3 + 2] = va;
+    if (!top[0] || f.a > top[0].a) { top[2] = top[1]; top[1] = top[0]; top[0] = f; } else if (!top[1] || f.a > top[1].a) { top[2] = top[1]; top[1] = f; } else if (!top[2] || f.a > top[2].a) top[2] = f;
+  }
+  o.fgeo.attributes.position.needsUpdate = true; o.fgeo.attributes.color.needsUpdate = true;
+  for (i = 0; i < 3; i++) { var tf = top[i], pl = o.fl[i]; if (tf && tf.a > 0.02) { pl.position.set(tf.x, tf.y, tf.z); pl.intensity = tf.a * lum * 0.30; } else pl.intensity = 0; }
+  o.renderer.render(o.scene, o.cam);
 }
 
 // ---------- Les yeux de la créature ----------
@@ -1037,7 +1187,7 @@ function regiePage() {
 var IS_REGIE = /^#regie/.test(location.hash);
 
 // ---------- Boucle ----------
-var last = 0, started = false;
+var last = 0, started = false, gl3on = false;
 function frame(ms) {
   requestAnimationFrame(frame);
   var now = ms / 1000, dt = clamp(now - last, 0, 0.05); last = now; T = now;
@@ -1052,8 +1202,11 @@ function frame(ms) {
   think(dt); tickPerf(dt); animate(dt);
 
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-  if (isInv()) { layout(); drawInvocation(dt, lightCap()); drawEyesInv(); } else { drawScene(dt, lightCap());
+  if (!(isInv() && g3)) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+  var use3 = isInv() && !!g3;
+  if (use3 !== gl3on) { gl3on = use3; document.getElementById('gl').style.display = use3 ? 'block' : 'none'; cv.style.background = use3 ? 'transparent' : '#000'; }
+  if (use3) { ctx.clearRect(0, 0, W, H); render3D(dt, lightCap()); }
+  else if (isInv()) { layout(); drawInvocation(dt, lightCap()); drawEyesInv(); } else { drawScene(dt, lightCap());
   drawEyes(); }
   G.onset = false; V.onset = false;
   if (panelOpen) refreshPanel();
@@ -1061,6 +1214,7 @@ function frame(ms) {
   remoteTick();
 }
 requestAnimationFrame(frame);
+if (!IS_REGIE) load3D();
 
 // ---------- Régie ----------
 var panel = document.getElementById('panel'), panelOpen = false, inputs = {};
