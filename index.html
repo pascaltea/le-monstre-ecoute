@@ -871,7 +871,7 @@ function drawEyesInv() {
 // ---------- L'invocation en vraie 3D ----------
 // Une boîte creusée derrière l'écran, un mur percé d'une fenêtre, une créature modelée en volume. La caméra ne bouge jamais :
 // seul ce qui franchit le plan de la fenêtre peut dépasser du cadre. Les notes sont des lucioles ; certaines sortent aussi.
-var T3 = null, g3 = null, R3 = 0.42, D3 = 1.7, NF = 48;
+var T3 = null, g3 = null, HX = 0.54, HY = 0.46, HZ = 0.47, D3 = 1.7, NF = 48;
 function load3D() {
   var srcs = ['./vendor/three.module.js', 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js'];
   function tryAt(i) { if (i >= srcs.length) return Promise.reject(new Error('3D indisponible')); return import(srcs[i]).catch(function () { return tryAt(i + 1); }); }
@@ -886,10 +886,10 @@ function stippleTex() {
 function eyeTex() {
   var c = document.createElement('canvas'); c.width = 512; c.height = 256; var g = c.getContext('2d'), x = 128, y = 128;
   g.fillStyle = '#fff'; g.fillRect(0, 0, 512, 256);
-  g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, 34, 0, 7); g.fill();
-  g.fillStyle = '#8a8a8a'; g.beginPath(); g.arc(x, y, 28, 0, 7); g.fill();
-  g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, 13, 0, 7); g.fill();
-  g.fillStyle = '#fff'; g.beginPath(); g.arc(x + 5, y - 5, 3.5, 0, 7); g.fill();
+  g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, 50, 0, 7); g.fill();          // iris cerné de noir, comme sur l'affiche
+  g.fillStyle = '#8f8f8f'; g.beginPath(); g.arc(x, y, 43, 0, 7); g.fill();
+  g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, 25, 0, 7); g.fill();          // grande pupille : un regard doux
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(x + 10, y - 10, 7, 0, 7); g.fill();
   return new T3.CanvasTexture(c);
 }
 function dotTex() {
@@ -917,16 +917,28 @@ function build3D() {
   var z = -D3, P = function (x, y, zz) { return new THREE.Vector3(x, y, zz); };
   o.scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([P(-1, 0, z), P(1, 0, z), P(1, 0, z), P(1, 1, z), P(1, 1, z), P(-1, 1, z), P(-1, 1, z), P(-1, 0, z),
     P(-1, 0, 0), P(-1, 0, z), P(1, 0, 0), P(1, 0, z), P(1, 1, 0), P(1, 1, z), P(-1, 1, 0), P(-1, 1, z)]), o.edgeMat));
-  // la créature
-  var skin = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, map: stippleTex(), roughness: 1, metalness: 0 });
-  o.head = new THREE.Mesh(new THREE.SphereGeometry(R3, 64, 40), skin); o.head.scale.set(1, 0.96, 1); o.scene.add(o.head);
-  o.body = new THREE.Mesh(new THREE.SphereGeometry(0.60, 48, 32), skin); o.scene.add(o.body);
-  o.neck = new THREE.Mesh(new THREE.CylinderGeometry(R3 * 0.80, R3 * 1.0, 1, 40, 1, true), skin); o.scene.add(o.neck);
+  // la créature : le dôme de l'affiche. Large, lisse, sombre, un liseré de lumière en haut à gauche, deux yeux posés tout en bas.
+  o.skin = new THREE.ShaderMaterial({
+    uniforms: { uTex: { value: stippleTex() }, uRim: { value: 0 }, uFP: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] }, uFI: { value: [0, 0, 0] } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vW; varying vec2 vUv;\nvoid main(){ vUv = uv; vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; vec4 mv = viewMatrix * w; vV = -mv.xyz; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform sampler2D uTex; uniform float uRim; uniform vec3 uFP[3]; uniform float uFI[3]; varying vec3 vN; varying vec3 vV; varying vec3 vW; varying vec2 vUv;\n' +
+      'void main(){ vec3 N = normalize(vN); vec3 V = normalize(vV);\n' +
+      ' float fres = pow(1.0 - max(dot(N, V), 0.0), 1.9);\n' +
+      ' float side = smoothstep(-0.35, 0.85, dot(N, normalize(vec3(-0.62, 0.78, 0.05))));\n' +          // la lumière vient d'en haut à gauche
+      ' float key = max(dot(N, normalize(vec3(-0.5, 0.85, 0.3))), 0.0);\n' +
+      ' float b = uRim * (fres * (0.22 + 1.25 * side) + key * 0.30);\n' +
+      ' for (int i = 0; i < 3; i++) { vec3 L = uFP[i] - vW; float d2 = dot(L, L); b += uFI[i] * max(dot(N, normalize(L)), 0.0) / (0.12 + d2 * 3.0); }\n' +
+      ' float st = texture2D(uTex, vUv * vec2(9.0, 5.0)).r;\n' +
+      ' float g = smoothstep(st * 0.9 + 0.04, st * 0.9 + 0.30, b * 1.5);\n' +                            // le dégradé se fait en grain, comme le pointillé de l'affiche
+      ' gl_FragColor = vec4(vec3(g * min(1.0, 0.30 + b * 0.9)), 1.0); }'
+  });
+  o.headG = new THREE.Group(); o.scene.add(o.headG);
+  o.head = new THREE.Mesh(new THREE.SphereGeometry(1, 72, 48), o.skin); o.head.scale.set(HX, HY, HZ); o.headG.add(o.head);
   var et = eyeTex(), em = new THREE.MeshBasicMaterial({ map: et, color: 0xffffff }); o.eyeMat = em; o.eyes = [];
   for (i = 0; i < 2; i++) {
-    var sg = i === 0 ? -1 : 1, ya = 0.42 * sg, pa = -0.20, grp = new THREE.Group();
-    grp.position.set(Math.sin(ya) * Math.cos(pa) * R3 * 0.84, Math.sin(pa) * R3 * 0.84, Math.cos(ya) * Math.cos(pa) * R3 * 0.84);
-    var ball = new THREE.Mesh(new THREE.SphereGeometry(R3 * 0.27, 40, 28), em); grp.add(ball); o.head.add(grp); o.eyes.push({ grp: grp, ball: ball });
+    var sg = i === 0 ? -1 : 1, ya = 0.44 * sg, pa = -0.12, grp = new THREE.Group();
+    grp.position.set(Math.sin(ya) * Math.cos(pa) * HX * 0.95, Math.sin(pa) * HY * 0.95, Math.cos(ya) * Math.cos(pa) * HZ * 0.95);
+    var ball = new THREE.Mesh(new THREE.SphereGeometry(0.112, 40, 28), em); grp.add(ball); o.headG.add(grp); o.eyes.push({ grp: grp, ball: ball });
   }
   // la lumière : presque rien. La voix l'éclaire, les lucioles la frôlent.
   o.amb = new THREE.AmbientLight(0xffffff, 0.02); o.scene.add(o.amb);
@@ -957,35 +969,35 @@ function render3D(dt, cap) {
   if (w !== o.w || h !== o.h) { o.w = w; o.h = h; o.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); o.renderer.setSize(w, h, false); o.cam.aspect = w / h; o.cam.updateProjectionMatrix(); }
   invDynamics(dt);
 
-  // Son chemin : elle monte du fond, s'approche, passe la tête par la fenêtre, puis la lève et la penche vers nous
-  var a = ease(clamp(vis / 0.28, 0, 1)), b = ease(clamp((vis - 0.28) / 0.40, 0, 1)), c = ease(clamp((vis - 0.68) / 0.17, 0, 1)), e = ease(clamp((vis - 0.85) / 0.15, 0, 1));
-  var y = -1.25 * R3 + 2.05 * R3 * a, z = -D3 * 0.72;
-  y = lerp(y, 0.50, b); z = lerp(z, -1.18 * R3, b);
-  y = lerp(y, 0.53, c); z = lerp(z, 1.10 * R3, c);
-  y = lerp(y, 0.84, e); z = lerp(z, 1.42 * R3, e);
-  var walk = Math.sin(vis * 46) * b * (1 - b) * 4, x = headYaw * (0.05 + 0.22 * e) + walk * 0.012;
-  y += Math.sin(T * 1.05) * 0.006;
-  o.hp.set(x, y, z); o.head.position.copy(o.hp);
-  o.head.rotation.set(e * 0.50 + c * 0.10 + headPitch * 0.10, headYaw * (0.25 + 0.25 * e), -(headRoll * 0.8 + walk * 0.02), 'YXZ');
-  var bx = x * 0.3, by = lerp(-0.95, -0.12, a), bz = clamp(z - 0.62, -D3 + 0.62, -0.66);
-  o.body.position.set(bx, by, bz);
-  o.tmp.set(x - bx, y - (by + 0.2), z - bz); var nl = o.tmp.length() || 0.001;
-  o.neck.position.set((x + bx) / 2, (y + by + 0.2) / 2, (z + bz) / 2); o.neck.scale.set(1, nl, 1); o.neck.quaternion.setFromUnitVectors(o.up, o.tmp.normalize());
-  var vis3 = vis > 0.01; o.head.visible = o.body.visible = o.neck.visible = vis3;
+  // Son chemin. D'abord elle est le dôme de l'affiche : posée sur le sol de la boîte, les yeux au ras du bord.
+  // Puis elle se soulève et passe sa tête ronde par la fenêtre : pas de cou, pas de corps, juste sa tête qui dépasse, penchée vers nous.
+  var a = ease(clamp(vis / 0.22, 0, 1)), b = ease(clamp((vis - 0.22) / 0.28, 0, 1)), c1 = ease(clamp((vis - 0.52) / 0.12, 0, 1)), c2 = ease(clamp((vis - 0.62) / 0.22, 0, 1)), e = ease(clamp((vis - 0.82) / 0.18, 0, 1));
+  var y = lerp(-0.56, 0.13, a), z = -1.15;
+  z = lerp(z, -0.64, b);
+  y = lerp(y, 0.50, c1);
+  z = lerp(z, 0.30, c2);
+  y = lerp(y, 0.635 + 0.008 * Math.sin(T * 0.6), e);                    // sa tête dépasse du haut du cadre ; l'arrière reste dans la fenêtre
+  var walk = Math.sin(vis * 40) * b * (1 - b) * 4, x = headYaw * (0.04 + 0.16 * c2) + walk * 0.012;
+  y += Math.sin(T * 1.05) * 0.005 + Math.abs(walk) * 0.010;
+  o.hp.set(x, y, z); o.headG.position.copy(o.hp);
+  o.headG.rotation.set(e * 0.20 + headPitch * 0.08 * c2, headYaw * (0.16 + 0.22 * c2), -(headRoll * 0.9 + walk * 0.025), 'YXZ');
+  var sq = 1 + 0.012 * Math.sin(T * 1.05); o.headG.scale.set(2 - sq, sq, 1);                               // elle respire
+  var vis3 = vis > 0.01; o.headG.visible = vis3;
 
   // Ses yeux visent vraiment ceux qu'elle regarde, dans la salle
   var op = eye.open * ease(clamp((vis - 0.14) / 0.14, 0, 1)); if (eye.blink > 0) op *= Math.abs(eye.blink - 0.075) / 0.075 * 0.9 + 0.02;
-  var far = mind.target === 'pb' ? 6 : 2.6, gxw = eye.gx * 2.7, gyw = 0.30 - (eye.gy + 0.45) * 1.5;
+  var far = mind.target === 'pb' ? 5 : 2.6, gxw = eye.gx * 2.4, gyw = 0.42 - (eye.gy + 0.2) * 1.1;
   for (i = 0; i < 2; i++) {
-    var E = o.eyes[i]; E.grp.scale.set(1 + 0.08 * eye.wide, Math.max(0.03, op) * (1 + 0.08 * eye.wide), 1); E.grp.visible = op > 0.01;
+    var E = o.eyes[i]; E.grp.scale.set(1 + 0.10 * eye.wide, Math.max(0.03, op) * (1 + 0.10 * eye.wide), 1); E.grp.visible = op > 0.01;
     o.tmp.set(gxw, gyw, far); E.ball.lookAt(o.tmp);
   }
   o.eyeMat.color.setScalar(S.eyeBright);
 
   // La lumière
-  var act = Math.max(voiceEnv, guitEnv * 0.5), pres = ease(clamp((vis - 0.10) / 0.3, 0, 1));
-  o.key.intensity = (0.10 + 0.90 * act) * pres * lum * 2.6 * (0.35 + 0.65 * (c + e) / 2 + 0.2);
-  o.rimL.intensity = (0.15 + 0.85 * act) * pres * lum * 0.16;
+  var act = Math.max(voiceEnv, guitEnv * 0.5), pres = ease(clamp((vis - 0.04) / 0.2, 0, 1));
+  o.skin.uniforms.uRim.value = (0.30 + 0.70 * act) * pres * lum * 1.9;
+  o.key.intensity = (0.10 + 0.90 * act) * lum * 0.9;
+  o.rimL.intensity = 0;
   o.amb.intensity = 0.012 * lum;
   o.frameMat.opacity = clamp((0.26 + 0.42 * inv) * lum, 0, 1); o.edgeMat.opacity = clamp((0.07 + 0.11 * inv) * lum, 0, 1);
 
@@ -996,7 +1008,7 @@ function render3D(dt, cap) {
     if (f.age < f.life) {
       var ax = rnd(-1, 1) * 0.25, ay = rnd(-1, 1) * 0.25, az = rnd(-1, 1) * 0.25;
       if (f.out && f.age > 1.1) { ax += (f.tx - f.x) * 0.55; ay += (f.ty - f.y) * 0.55; az += (f.tz - f.z) * 0.55; }
-      else if (vis3 && voiceEnv > 0.05) { var dx = x - f.x, dy = y + 0.1 - f.y, dz = z - f.z, dd = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1, pull = voiceEnv * 0.45 * (dd > R3 * 1.5 ? 1 : -1.2); ax += dx / dd * pull - dz / dd * 0.25 * voiceEnv; ay += dy / dd * pull; az += dz / dd * pull + dx / dd * 0.25 * voiceEnv; }
+      else if (vis3 && voiceEnv > 0.05) { var dx = x - f.x, dy = y + 0.1 - f.y, dz = z - f.z, dd = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1, pull = voiceEnv * 0.45 * (dd > 0.75 ? 1 : -1.2); ax += dx / dd * pull - dz / dd * 0.25 * voiceEnv; ay += dy / dd * pull; az += dz / dd * pull + dx / dd * 0.25 * voiceEnv; }
       f.vx += ax * dt; f.vy += ay * dt; f.vz += az * dt; var dmp = Math.exp(-dt / 1.3); f.vx *= dmp; f.vy *= dmp; f.vz *= dmp;
       f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt;
       if (!f.out || f.age <= 1.1) { f.x = clamp(f.x, -0.95, 0.95); f.y = clamp(f.y, 0.04, 0.96); f.z = clamp(f.z, -D3 + 0.05, -0.04); }
@@ -1008,7 +1020,7 @@ function render3D(dt, cap) {
     if (!top[0] || f.a > top[0].a) { top[2] = top[1]; top[1] = top[0]; top[0] = f; } else if (!top[1] || f.a > top[1].a) { top[2] = top[1]; top[1] = f; } else if (!top[2] || f.a > top[2].a) top[2] = f;
   }
   o.fgeo.attributes.position.needsUpdate = true; o.fgeo.attributes.color.needsUpdate = true;
-  for (i = 0; i < 3; i++) { var tf = top[i], pl = o.fl[i]; if (tf && tf.a > 0.02) { pl.position.set(tf.x, tf.y, tf.z); pl.intensity = tf.a * lum * 0.30; } else pl.intensity = 0; }
+  for (i = 0; i < 3; i++) { var tf = top[i], pl = o.fl[i]; if (tf && tf.a > 0.02) { pl.position.set(tf.x, tf.y, tf.z); pl.intensity = tf.a * lum * 0.30; o.skin.uniforms.uFP.value[i].set(tf.x, tf.y, tf.z); o.skin.uniforms.uFI.value[i] = tf.a * lum * 0.5; } else { pl.intensity = 0; o.skin.uniforms.uFI.value[i] = 0; } }
   o.renderer.render(o.scene, o.cam);
 }
 
