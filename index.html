@@ -188,7 +188,7 @@ var DEF = {
   twoCh: false, vSplit: 0.45, swap: false, gainV: 0, gainG: 0, thrV: -45, thrG: -45, bleed: 15,
   cxX: -0.6, cxY: 0.1, gtX: 0.6, gtY: 0.1, pbX: 0, pbY: 0.3, mouse: false,
   zoom: 0.85, frameY: 0, eyeBright: 0.95, speed: 1, sleepAfter: 8,
-  version: 'yeux', yeuxSize: 0.46, yeuxY: 0.50, yFly: false, ySil: false, gFly: true, gSil: true, gFps: 9, amb: 1, maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
+  version: 'yeux', yeuxSize: 0.40, yeuxY: 0.40, yFly: false, ySil: false, gFly: true, gSil: true, gFps: 9, amb: 1, maxLum: 0.6, reveal: 0.55, lyFly: true, lyMoon: true, lyBack: true, lyAwn: true, lyWin: true, lyStripe: true, lyWave: true,
   duration: 240, autoEnd: false, simSound: true, remote: true, code: '', colL: '#f0f0f0', colY: '#fefe00', colG: '#1e6f4c'
 };
 var S = {};
@@ -199,6 +199,7 @@ function loadS() {
 }
 function saveS() { try { localStorage.setItem('monstre-ecoute-4', JSON.stringify(S)); } catch (e) {} }
 loadS();
+if (S.yeuxSize === 0.46 && S.yeuxY === 0.5) { S.yeuxSize = DEF.yeuxSize; S.yeuxY = DEF.yeuxY; }
 if (/[?&]invocation\b/.test(location.search)) S.version = 'inv';
 if (/[?&]cour\b/.test(location.search)) S.version = 'cour';
 (function () { var m = /[?&]amb=([123])/.exec(location.search); if (m) S.amb = parseInt(m[1], 10); })();
